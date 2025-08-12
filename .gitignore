@@ -1,0 +1,48 @@
+# ----------------------------
+# Python cache & bytecode files
+# ----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ----------------------------
+# Virtual environment folders
+# ----------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# ----------------------------
+# VS Code settings
+# ----------------------------
+.vscode/
+
+# ----------------------------
+# Distribution / packaging
+# ----------------------------
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ----------------------------
+# Unit test / coverage reports
+# ----------------------------
+htmlcov/
+.tox/
+.nox/
+.coverage
+coverage.xml
+.pytest_cache/
+
+# ----------------------------
+# Jupyter Notebook
+# ----------------------------
+.ipynb_checkpoints
+
+# ----------------------------
+# Environment variables / secrets
+# ----------------------------
+.env
+.env.*
