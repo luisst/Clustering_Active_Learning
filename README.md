@@ -8,6 +8,7 @@
 - MetaSR
 - HDBSCAN
 - TDA
+- https://github.com/jameslyons/python_speech_features/tree/master
 
 ### Installation Steps
 
