@@ -4,13 +4,34 @@ import torch
 from pathlib import Path
 from tqdm import tqdm
 import argparse
-import sys
-import re
+import os
+import warnings
 
 from Stg2_models import SimpleClassifier
 from Stg2_dataloaders import inference_dataloader
 
-from pipeline_utilities import log_print, valid_path
+warnings.filterwarnings('ignore', category=FutureWarning)
+# from pipeline_utilities import log_print, valid_path
+
+def log_print(*args, **kwargs):
+    """Prints to stdout and also logs to log_path."""
+
+    log_path = kwargs.pop('lp', 'default_log.txt')
+    print_to_console = kwargs.pop('print', True)
+
+    message = " ".join(str(a) for a in args)
+    if print_to_console:
+        print(message)
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(message + "\n")
+
+
+def valid_path(path):
+    if os.path.exists(path):
+        return Path(path)
+    else:
+        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
+
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -18,52 +39,34 @@ root_path = Path.home() / 'Dropbox' / 'DATASETS_AUDIO' / 'Dvectors'
 main_folder_path = root_path / 'TTS4_clean_40-300'
 inference_feats_pickle_path_ex = root_path / 'wavs_test_pairs' / 'd_vectors_aolme.pickle'
 
-exp_name_ex = 'S1_Bal300Clean_sc2'
-run_params_ex = 'mask00_lr-5_ep180'
-
+run_id_ex = 'S1_Bal300Clean_sc2'
 
 # Create output folder in the same directory as feats_pickle_path
-output_folder_ex = main_folder_path / f'{exp_name_ex}_{run_params_ex}_output'
-
-num_speakers_pretrained_ex = 73  # Assuming you have 2 speakers in the pretrained model
-model_pretrained_path_ex = output_folder_ex / f'model_{exp_name_ex}_{run_params_ex}_{num_speakers_pretrained_ex}.pth'
+output_folder_ex = main_folder_path / f'{run_id_ex}_output'
+num_speakers_pretrained_ex = 73  
+model_pretrained_path_ex = output_folder_ex / f'model_.pth'
+output_enhanced_pickle_ex = output_folder_ex / f'enhanced_{run_id_ex}.pickle'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--inference_feats_pickle', default=inference_feats_pickle_path_ex, help='Path to the folder to store the D-vectors features')
 parser.add_argument('--pretrained_model_path', default=model_pretrained_path_ex, help='Path to the pretrained model')
-parser.add_argument('--output_pred_folder', type=valid_path, default=output_folder_ex, help='Path to the folder to store the predictions')
-parser.add_argument('--run_params', default=run_params_ex, help='string with the run params for HDBSCAN')
-parser.add_argument('--exp_name', default=exp_name_ex, help='string with the experiment name')
-
+parser.add_argument('--enhanced_feats_pickle', default=output_enhanced_pickle_ex, help='Path to the folder to store the predictions')
+parser.add_argument('--run_id', default=run_id_ex, help='string with the experiment name')
 args = parser.parse_args()
-output_folder_path = Path(args.output_pred_folder)
-inference_feats_pickle_path = Path(args.inference_feats_pickle)
 
-run_params = args.run_params
-exp_name = args.exp_name
+inference_feats_pickle_path = Path(args.inference_feats_pickle)
+model_pretrained_path = Path(args.pretrained_model_path)
+enhanced_feats_and_labels = Path(args.enhanced_feats_pickle)
+run_id = args.run_id
 
 batch_size = 16
 num_workers = 4
 
+output_folder_path = enhanced_feats_and_labels.parent 
 log_path = output_folder_path / 'inference_log.txt'
-enhanced_feats_and_labels = output_folder_path / f'inference_{exp_name}_{run_params}.pickle'
-model_pretrained_path = args.pretrained_model_path 
 
-# Verify the pretrained model path with run_params and exp_name
-if model_pretrained_path.stem.split('_')[0] != 'model':
-    sys.exit(f"Pretrained model path {model_pretrained_path} does not match expected format")
-
-pattern = r"model_(.+)_(\d+)"
-match = re.match(pattern, model_pretrained_path.stem)
-
-if match:
-    validate_exp_runparams = match.group(1)
-    number_speakers_pretrained = int(match.group(2)) # Convert to scientific notation
-else:
-    sys.exit("Invalid run_name format")
-
-if validate_exp_runparams != f'{exp_name}_{run_params}':
-    sys.exit(f"Pretrained model path {model_pretrained_path} does not match expected experiment name and run parameters: {exp_name}_{run_params}")
+number_speakers_pretrained = int(model_pretrained_path.stem.split('_')[-1])
+print(f'Loaded {number_speakers_pretrained} number of speakers from pre-trained model')
 
 log_print(f"Using pretrained model: {model_pretrained_path}", lp=log_path)
 

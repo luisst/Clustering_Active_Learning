@@ -5,9 +5,9 @@ import resnet_256 as resnet
 from torch.nn import Parameter
 
 
-class background_resnet(nn.Module):
+class background_resnet_ext(nn.Module):
     def __init__(self, num_classes, inter_size=256, backbone='resnet34', pretrained_path=None):
-        super(background_resnet, self).__init__()
+        super(background_resnet_ext, self).__init__()
         self.backbone = backbone
         # copying modules from pretrained models
         if backbone == 'resnet50':
@@ -77,7 +77,52 @@ class background_resnet(nn.Module):
             # During evaluation, return original weights
             return self.fc_final.weight, self.fc_final.bias
 
+class background_resnet(nn.Module):
+    def __init__(self, num_classes, backbone='resnet34', pretrained_path=None):
+        super(background_resnet, self).__init__()
+        self.backbone = backbone
+        # copying modules from pretrained models
+        if backbone == 'resnet50':
+            self.pretrained = resnet.resnet50(pretrained=False)
+        elif backbone == 'resnet101':
+            self.pretrained = resnet.resnet101(pretrained=False)
+        elif backbone == 'resnet152':
+            self.pretrained = resnet.resnet152(pretrained=False)
+        elif backbone == 'resnet18':
+            self.pretrained = resnet.resnet18(pretrained=False)
+        elif backbone == 'resnet34':
+            self.pretrained = resnet.resnet34(pretrained=False)
+        else:
+            raise RuntimeError('unknown backbone: {}'.format(backbone))
 
+        self.fc1 = Parameter(torch.Tensor(256, 256))
+        nn.init.xavier_uniform_(self.fc1)
+
+        self.weight = Parameter(torch.Tensor(num_classes, 256))
+        nn.init.xavier_uniform_(self.weight)
+
+        self.relu = nn.ReLU()
+
+
+    def forward(self, x):
+        x = self.pretrained.conv1(x)
+        x = self.pretrained.bn1(x)
+        x = self.pretrained.relu(x)
+
+        x = self.pretrained.layer1(x)
+        x = self.pretrained.layer2(x)
+        x = self.pretrained.layer3(x)
+        x = self.pretrained.layer4(x) #[batch, 256, *, *]
+
+
+        # Global Average Pooling
+        x = x.flatten(start_dim=2)
+        x = x.mean(dim=2)
+        x = self.relu(self.pretrained.avg_bn(x))
+
+        spk_embedding = F.linear(x, self.fc1)
+
+        return spk_embedding
 
 class SimpleClassifier(nn.Module):
     def __init__(self, dim=256, hidden_dim=128, num_classes=2, dropout_rate=0.4):

@@ -1,0 +1,15 @@
+
+0) Generate TTS4 synthetic data using 'https://github.com/luisst/Noisy-Speech_Acoustics_Sim'
+    - Use DoubleTalk_main.py
+    - Set pattern_flag = False, double_talk_flag = False, ordered_sp_flag = True
+    - ordered_sp_flag will require a txt file with a list of the input TTS4 files to be called in order
+
+1) Copy the WAV and CSV_GT generated into 'input_LONG_wavs' and 'input_LONG_csv', then run 01_convert_TTS4_dvectors_dataset.py
+    - This will create a input_wav folder with all the individual TTS4 input files processed
+
+2) Run Stg2a_feature_extraction.py as stand-alone, modifying the 'ex' folders. 
+    - Starting point for dataset Dvec_train
+
+3) Run Stg2b_inference_dvectors (with default pretrained model or finetuned) and obtain a pickle file with:
+    - Dvectors, Labels, Wav_paths
+    - Starting point for dataset enhance_train

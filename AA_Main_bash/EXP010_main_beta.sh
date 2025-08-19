@@ -9,10 +9,12 @@ export DATASET_NAME="TestAO-Irma"
 
 export VAD_NAME="SHAS"
 export FEAT_NAME="DV"
-export METHOD_NAME="umap1H10"
+export METHOD_NAME="uH10NoEn"
 
 ## Optional methods
 export DOUBLE_TALK_FLAG=true
+export SILENT_DET_FLAG=true
+export ENHANCE_FLAG=false
 
 ## If GT_CSV_FOLDER is provided, predict_only will be set to false
 export GT_CSV_FOLDER="${ROOT_PATH}/${DATASET_NAME}/GT_final/"
@@ -28,7 +30,8 @@ export VAD_LOCATION="/home/luis/Dropbox/SpeechSpring2023/shas"
 
 ## Pretrained models used:
 export STG1_DT_PRETRAINED="${SRC_PATH}/pre-trained/best_overlap_detection_model_xvectors_May20.pth"
-export STG1_VAD_PRETRAINED="${VAD_LOCATION}/en_sfc_model_epoch-6.pt"
+export STG1_VAD_PRETRAINED="${VAD_LOCATION}/en_sfc_model_epoch-6.pth"
+export STG2_ENH_PRETRAINED="${SRC_PATH}/pre-trained/model_mask00_ep180_betaAug18_73.pth"
 
 ## Segmentation Parameters
 export seg_ln="1.0"
@@ -42,45 +45,46 @@ echo -e "\t>>>>> STG-1 VAD, Chunks Divide, Silent Detection, Double-Talk Detecti
 
 #### Stage 1 VAD
 export current_stg1="${ROOT_PATH}/${DATASET_NAME}/STG_1/STG1_${VAD_NAME}"
+export STG1_WAVS="${ROOT_PATH}/${DATASET_NAME}/input_wavs/"
 export STG1_FILTERED_CHUNKS_WAVS="${current_stg1}/wav_chunks_filtered"
 
-source ./BB_Stages_bash/STG1_SHAS.sh
+# source ./BB_Stages_bash/STG1_SHAS.sh
 
 #### Stage 2 Feature Extraction
 export current_stg2="${ROOT_PATH}/${DATASET_NAME}/STG_2/STG2_${EXP_NAME}-${VAD_NAME}-${FEAT_NAME}"
+
 export STG2_FEATS_PICKLE="${current_stg2}/${DATASET_NAME}_${VAD_NAME}_${FEAT_NAME}_feats.pickle"
+export STG2_FEATS_ENHANCED="${current_stg2}/${DATASET_NAME}_${VAD_NAME}_${FEAT_NAME}_featsEN-false.pickle"
 
-# if [ "$MOVE_ON" = true ]; then
-# source STG2_DVECTORS.sh
-# fi
+export ENHANCE_RUN_ID="skipped"
 
-# #### Stage 3 Unsupervised Method
-# export current_stg3="${ROOT_PATH}/${DATASET_NAME}/STG_3/STG3_${EXP_NAME}-${SHAS_NAME}-${FEAT_NAME}-${METHOD_NAME}"
-# export STG3_MERGED_WAVS="${current_stg3}/merged_wavs"
-# export STG3_FINAL_CSV="${current_stg3}/final_csv"
+if [ "$MOVE_ON" = true ]; then
+source ./BB_Stages_bash/STG2_DVECTORS_ENHANCER.sh
+fi
 
-# export pca_elem="0"
+#### Stage 3 Unsupervised Method
+export current_stg3="${ROOT_PATH}/${DATASET_NAME}/STG_3/STG3_${EXP_NAME}-${VAD_NAME}-${FEAT_NAME}-${METHOD_NAME}"
+export STG3_MERGED_WAVS="${current_stg3}/merged_wavs"
+export STG3_FINAL_CSV="${current_stg3}/final_csv"
 
-# export min_cluster_size="25"
-# export hdb_mode="eom"
-# export min_samples="5"
+export pca_elem="0"
 
-# export min_cluster_size="5"
-# export hdb_mode="leaf"
-# export min_samples="5"
+export min_cluster_size="25"
+export hdb_mode="eom"
+export min_samples="5"
 
-# export RUN_PARAMS="pca${pca_elem}_mcs${min_cluster_size}_ms${min_samples}_${hdb_mode}"
+export RUN_PARAMS="pca${pca_elem}_mcs${min_cluster_size}_ms${min_samples}_${hdb_mode}"
 
-# cd $SRC_PATH
-# if [ "$MOVE_ON" = true ]; then
-# source STG3_META_HDB.sh
-# fi
+cd $SRC_PATH
+if [ "$MOVE_ON" = true ]; then
+source ./BB_Stages_bash/STG3_META_HDB.sh
+fi
 
 
 # #### Stage 4 Metrics
 # export STG1_GT_CSV="${ROOT_PATH}/${DATASET_NAME}/GT_final/"
 # export STG4_METRICS="${current_stg3}/metrics"
-# export STG4_METRIC_RUNNAME="${DATASET_NAME}_${SHAS_NAME}_${FEAT_NAME}_${METHOD_NAME}"
+# export STG4_METRIC_RUNNAME="${DATASET_NAME}_${VAD_NAME}_${FEAT_NAME}_${METHOD_NAME}"
 
 # export pred_suffix_added="pred"
 # export pred_ext="csv"

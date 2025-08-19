@@ -27,14 +27,16 @@ def valid_path(path):
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
 root_ex = Path('/home/luis/Dropbox/DATASETS_AUDIO')
-wavs_folder_ex = root_ex / Path('Dvectors/TTS4_clean_40-300/input_wavs')
-mfcc_folder_ex = root_ex / Path('Dvectors/TTS4_clean_40-300/input_feats')
-feats_pickle_ex = mfcc_folder_ex.parent / Path('d_vectors_feats.pickle')
+wavs_folder_ex = root_ex / Path('Dvectors/TTS4_easy_40-200/input_wavs')
+mfcc_folder_ex = root_ex / Path('Dvectors/TTS4_easy_40-200/input_feats')
+feats_pickle_ex = mfcc_folder_ex.parent / Path('dvec_easy40-200.pickle')
+pretrained_path_ex = root_ex.parent / 'Source_2025' / 'pre-trained' / f'checkpoint_100_original_5994.pth'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--wavs_folder', type=valid_path, default=wavs_folder_ex, help='Path to the folder to input chunks wavs paths')
 parser.add_argument('--input_mfcc_folder', type=valid_path, default=mfcc_folder_ex, help='Path to the folder to load the mfcc feats')
 parser.add_argument('--output_feats_pickle', default=feats_pickle_ex, help='Path to the folder to store the D-vectors features')
+parser.add_argument('--pretrained_model_path', default=pretrained_path_ex, help='Path to pretrained Dvector model')
 args = parser.parse_args()
 
 #TODO: samples_flag is set to True by default for inferences
@@ -43,10 +45,14 @@ wavs_folder = Path(args.wavs_folder)
 mfcc_folder_path = Path(args.input_mfcc_folder)
 feats_pickle_path = Path(args.output_feats_pickle)
 
+
+pretrained_path = Path(args.pretrained_model_path)
+
 percentage_test = 0.0
 
 dataset_dvectors = d_vectors_pretrained_model(mfcc_folder_path, percentage_test,
                                             wavs_folder,
+                                            pretrained_path,
                                             return_paths_flag = True,
                                             norm_flag = True,
                                             use_cuda=True,

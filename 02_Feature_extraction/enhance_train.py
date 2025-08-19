@@ -7,21 +7,41 @@ import pickle
 import argparse
 import sys
 import re
+import os
 
 from Stg2_models import SimpleClassifier
 from Stg2_dataloaders import create_dataloaders
 from enhance_utils import plot_training_metrics 
 
-from pipeline_utilities import log_print, valid_path
+# from pipeline_utilities import log_print, valid_path
+
+def log_print(*args, **kwargs):
+    """Prints to stdout and also logs to log_path."""
+
+    log_path = kwargs.pop('lp', 'default_log.txt')
+    print_to_console = kwargs.pop('print', True)
+
+    message = " ".join(str(a) for a in args)
+    if print_to_console:
+        print(message)
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(message + "\n")
+
+
+def valid_path(path):
+    if os.path.exists(path):
+        return Path(path)
+    else:
+        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 root_path = Path.home() / 'Dropbox' / 'DATASETS_AUDIO' / 'Dvectors'
-main_folder_path = root_path / 'TTS4_clean_40-300'
+main_folder_path = root_path / 'TTS4_easy_40-200'
 # feats_pickle_path_ex = main_folder_path / 'd_vectors_feats_2spk.pickle'
-feats_pickle_path_ex = main_folder_path / 'd_vectors_feats.pickle'
+feats_pickle_path_ex = main_folder_path / 'dvec_easy40-200.pickle'
 
-exp_name_ex = 'S1_Bal300Clean_sc2'
+exp_name_ex = 'S1_sNorm'
 # exp_name_ex = 'S1_600_sc'
 run_params_ex = 'mask00_lr-5_ep180'
 

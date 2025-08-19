@@ -12,7 +12,6 @@ export PYTHONPATH="${SRC_PATH}:${PYTHONPATH}"
 
 echo "1) Running VAD on the test set"
 
-export STG1_WAVS="${ROOT_PATH}/${DATASET_NAME}/input_wavs/"
 cd $VAD_LOCATION
 
 # Change Conda environment
@@ -72,7 +71,7 @@ if [ $? -ne 0 ]; then
     return 1
 fi
 
-if [ "$PREDICT_ONLY" = false ]; then
+if [ "$PREDICT_ONLY" = false  && ${MOVE_ON} = true ]; then
 echo -e "\n\t>>>>> Stage 1b: Metrics \n"
 export VAD_metric_folder="${ROOT_PATH}/${DATASET_NAME}/STG_1/STG1_${VAD_NAME}/metrics"
 python3 ${SRC_PATH}/folder_verify.py $VAD_metric_folder
@@ -92,7 +91,7 @@ fi
 
 echo -e "\n\t>>>>> Stage1c: Divide into chunks $STG1_WAVS \n"
 
-if [ ! ${SKIP_1C} = true ]; then
+if [ ! ${SKIP_1C} = true  && ${MOVE_ON} = true ]; then
     python3 ${SRC_PATH}/01_VAD_chunks/Stage1c_divide_into_chunks.py --stg1_wavs $STG1_WAVS\
      --stg1_final_csv $STG1_VAD_CSV \
      --stg1_chunks_wavs $STG1_RAW_CHUNKS_WAVS\
@@ -110,23 +109,38 @@ fi
 echo -e "\n\t>>>>> Stage 1d: Silent Detector $STG1_RAW_CHUNKS_WAVS\n"
 conda activate metaSR2
 export keep_perc="90"
-if [ ! ${SKIP_1D} = true ]; then
-    python3 ${SRC_PATH}/01_VAD_chunks/Stage1d_silent_detector.py --input_chunks_folder $STG1_RAW_CHUNKS_WAVS\
-     --filtered_wavs_folder $STG1_CHUNKS_WAVS\
-     --keep_perc $keep_perc
+if [ ! ${SKIP_1D} = true  && ${MOVE_ON} = true ]; then
+
+    if [ $DOUBLE_TALK_FLAG=true ]; then
+        python3 ${SRC_PATH}/01_VAD_chunks/Stage1d_silent_detector.py --input_chunks_folder $STG1_RAW_CHUNKS_WAVS\
+        --filtered_wavs_folder $STG1_CHUNKS_WAVS\
+        --keep_perc $keep_perc
+
+        # Check if the Python script was successful
+        if [ $? -ne 0 ]; then
+            export MOVE_ON=false
+            echo "Move on: $MOVE_ON"
+            return 1
+        fi
+    else
+        echo -e "\n\t>>>>> Silent detection SKIPPED! \n"
+        cp -r $STG1_RAW_CHUNKS_WAVS/* $STG1_CHUNKS_WAVS
+        # Check if the copy was successful
+        if [ $? -ne 0 ]; then
+            export MOVE_ON=false
+            echo "Move on: $MOVE_ON"
+            return 1
+        fi
+    fi
 else
     echo -e "\n\t>>>>> Stage 1d: Silent detection skipped\n"
 fi
 
-# Check if the Python script was successful
-if [ $? -ne 0 ]; then
-    export MOVE_ON=false
-    echo "Move on: $MOVE_ON"
-    return 1
-fi
+
 
 echo -e "\t>>>>> Stage 1e: Double-Talk detection $STG1_CHUNKS_WAVS"
 if [ ! ${SKIP_1E} = true ]; then
+
     if [ $DOUBLE_TALK_FLAG=true ]; then
         conda activate dtp11
         python3 ${SRC_PATH}/01_VAD_chunks/Stage1e_DT_detection.py --stg1_chunks_wavs $STG1_CHUNKS_WAVS\

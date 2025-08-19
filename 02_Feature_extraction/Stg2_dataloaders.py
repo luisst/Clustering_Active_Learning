@@ -4,11 +4,24 @@ import torchvision.transforms as transforms
 from metaSR_utils import TruncatedInputfromMFB, ToTensorInput, FILTER_BANK
 import random
 import numpy as np
+import pprint
 import pickle
 from torch.utils.data import Dataset, DataLoader
 
 from sklearn.model_selection import train_test_split
-from pipeline_utilities import log_print
+# from pipeline_utilities import log_print
+
+def log_print(*args, **kwargs):
+    """Prints to stdout and also logs to log_path."""
+
+    log_path = kwargs.pop('lp', 'default_log.txt')
+    print_to_console = kwargs.pop('print', True)
+
+    message = " ".join(str(a) for a in args)
+    if print_to_console:
+        print(message)
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(message + "\n")
 
 class metaGenerator(object):
 
@@ -344,7 +357,7 @@ class AudioDataset(Dataset):
 
 
 def create_dataloaders(pickle_file_path, log_path, batch_size=32, test_size=0.2, random_state=42, num_workers=4, 
-                      augment_training=True, noise_std=0.01, mask_prob=0.1):
+                      augment_training=True, noise_std=0.01, mask_prob=0.1, drop_last=True):
     """
     Create training and validation DataLoaders from a pickle file.
     
@@ -378,11 +391,33 @@ def create_dataloaders(pickle_file_path, log_path, batch_size=32, test_size=0.2,
     X_train, X_val, y_train, y_val, wavs_train, wavs_val = train_test_split(
         features, labels, wavs_paths, 
         test_size=test_size, 
-        random_state=random_state, 
         shuffle=True,
         stratify=labels  # Ensures balanced split across classes
     )
+
+    # Print all the distinct speakers in y_train
+    log_print(f"Distinct speakers in training set: {set(y_train)}", lp=log_path)
+    log_print(f"Distinct speakers in validation set: {set(y_val)}", lp=log_path)
+
+    # Create 2 dictionaries with speaker label and number of speakers in each label
+    speaker_counts_train = {label: 0 for label in set(y_train)}
+    speaker_counts_val = {label: 0 for label in set(y_val)}
+
+    for label in y_train:
+        speaker_counts_train[label] += 1
+
+    for label in y_val:
+        speaker_counts_val[label] += 1
     
+    # Log_print each value from the dictionaries
+    log_print("Speaker counts in training set:", lp=log_path)
+    for label, count in speaker_counts_train.items():
+        log_print(f"  - Speaker {label}: {count} samples", lp=log_path)
+
+    log_print("\n\nSpeaker counts in validation set:", lp=log_path)
+    for label, count in speaker_counts_val.items():
+        log_print(f"  - Speaker {label}: {count} samples", lp=log_path)
+
     # Create augmentor for training data if requested
     augmentor = DataAugmentor(noise_std=noise_std, mask_prob=mask_prob) if augment_training else None
     
@@ -397,7 +432,8 @@ def create_dataloaders(pickle_file_path, log_path, batch_size=32, test_size=0.2,
         shuffle=True,  # Additional shuffling for training
         num_workers=num_workers,
         pin_memory=True,  # Faster GPU transfer
-        collate_fn=custom_collate_fn
+        collate_fn=custom_collate_fn,
+        drop_last=drop_last
     )
     
     val_loader = DataLoader(
@@ -406,7 +442,8 @@ def create_dataloaders(pickle_file_path, log_path, batch_size=32, test_size=0.2,
         shuffle=False,  # No need to shuffle validation data
         num_workers=num_workers,
         pin_memory=True,
-        collate_fn=custom_collate_fn
+        collate_fn=custom_collate_fn,
+        drop_last=drop_last
     )
     
     train_samples_msg = f"Training samples: {len(train_dataset)}"

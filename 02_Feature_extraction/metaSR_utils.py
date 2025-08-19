@@ -12,11 +12,14 @@ from pathlib import Path
 import sys
 import pandas as pd
 import torch
+import argparse
+import os
 import torch.nn.functional as F
 from torch.autograd import Variable
 
 from Stg2_models import background_resnet
-from pipeline_utilities import log_print
+from Stg2_models import background_resnet_ext
+# from pipeline_utilities import log_print
 
 USE_LOGSCALE = True
 USE_NORM=  True
@@ -35,6 +38,25 @@ SAMPLE_RATE = 16000
 FILTER_BANK = 40
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def log_print(*args, **kwargs):
+    """Prints to stdout and also logs to log_path."""
+
+    log_path = kwargs.pop('lp', 'default_log.txt')
+    print_to_console = kwargs.pop('print', True)
+
+    message = " ".join(str(a) for a in args)
+    if print_to_console:
+        print(message)
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(message + "\n")
+
+
+def valid_path(path):
+    if os.path.exists(path):
+        return Path(path)
+    else:
+        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
 def round_half_up(number):
     return int(decimal.Decimal(number).quantize(decimal.Decimal('1'), rounding=decimal.ROUND_HALF_UP))
@@ -384,14 +406,14 @@ def extract_MFB_aolme(current_input_path, output_feats_folder):
         pickle.dump(feat_and_label, fp)
 
 
-def load_model_predict(log_dir, cp_num, n_classes, use_cuda = True):
+def load_model_predict(pretrained_path, n_classes, use_cuda = True):
     model = background_resnet(num_classes=n_classes)
 
     if use_cuda:
         model.cuda()
     print('=> loading checkpoint')
     # load pre-trained parameters
-    checkpoint = torch.load(log_dir + f'/checkpoint_100_original_{n_classes}.pth')
+    checkpoint = torch.load(pretrained_path)
     model.load_state_dict(checkpoint['state_dict'])
     model.eval()
     return model
@@ -568,8 +590,34 @@ def separate_dict_embeddings(dict_embeddings, percentage_test,
     else:
         return X_train, y_train, X_test, y_test, speaker_labels_dict_train
 
+
+def verify_matching_stems_to_file(wav_paths, pkl_paths, output_file):
+    wav_stems = {Path(p).stem for p in wav_paths}
+    pkl_stems = {Path(p).stem for p in pkl_paths}
+
+    missing_pkl = wav_stems - pkl_stems
+    missing_wav = pkl_stems - wav_stems
+
+    lines = []
+    if not missing_pkl and not missing_wav:
+        lines.append("✅ All stems match between WAV and PKL lists.")
+    else:
+        if missing_pkl:
+            lines.append("⚠ WAVs without matching PKL:")
+            for stem in sorted(missing_pkl):
+                lines.append(f"  - {stem}")
+        if missing_wav:
+            lines.append("⚠ PKLs without matching WAV:")
+            for stem in sorted(missing_wav):
+                lines.append(f"  - {stem}")
+
+    # Write to file
+    output_path = Path(output_file)
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"Report saved to {output_path}")
+
 def d_vectors_pretrained_model(feats_folder, percentage_test,
-                               wavs_paths,
+                               wavs_paths, pretrained_path,
                                return_paths_flag = False,
                                norm_flag = False,
                                use_cuda=True,
@@ -577,15 +625,13 @@ def d_vectors_pretrained_model(feats_folder, percentage_test,
 
     list_of_feats = sorted(list(feats_folder.glob('*.pkl')))
     list_of_wavs = sorted(list(wavs_paths.glob('*.wav')))
-    n_classes = 5994 # from trained with vox2
-    cp_num = 100
+    # n_classes = 5994 # from trained with vox2
+    n_classes = int(pretrained_path.stem.split('_')[-1])
 
-    log_dir = 'saved_model'
-    pwd_path = Path.cwd()
-    print(f'Current working directory: {pwd_path}')
-    
-    # load model from checkpoint
-    model = load_model_predict(log_dir, cp_num, n_classes, True)
+    # verify_matching_stems_to_file(list_of_wavs, list_of_feats, "stems_report.txt")
+
+    ## load model from checkpoint
+    model = load_model_predict(pretrained_path, n_classes, True)
 
 
     dict_embeddings = d_vector_dict_lbls(list_of_feats, model,

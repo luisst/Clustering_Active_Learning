@@ -6,8 +6,8 @@ import argparse
 
 
 root_dir = Path.home().joinpath('Dropbox','DATASETS_AUDIO')
-input_wavs_folder_ex = root_dir / 'Dvectors/TTS4_med_40-200/input_wavs' 
-output_feats_folder_ex = root_dir / 'Dvectors/TTS4_med_40-200/input_feats'
+input_wavs_folder_ex = root_dir / 'Dvectors/TTS4_easy_40-200/input_wavs' 
+output_feats_folder_ex = root_dir / 'Dvectors/TTS4_easy_40-200/input_feats'
 
 if not output_feats_folder_ex.exists():
     os.makedirs(output_feats_folder_ex)

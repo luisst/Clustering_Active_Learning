@@ -4,10 +4,9 @@ from pathlib import Path
 
 # Set paths
 root_folder = Path.home().joinpath("Dropbox", "DATASETS_AUDIO")
-main_folder = root_folder / "Dvectors" / "TTS4_medBAL_100-200"
-csv_folder = main_folder / "input_LONG_csv"
-wav_folder = main_folder / "input_LONG_wavs"
-output_folder = wav_folder.parent / "input_wavs"
+csv_folder = root_folder / "Dvectors" / "TTS4_easy_40-200" / "input_LONG_csv"
+wav_folder = root_folder / "Dvectors" / "TTS4_easy_40-200" / "input_LONG_wavs"
+output_folder = wav_folder.parent / "input_wavs" 
 output_folder.mkdir(parents=True, exist_ok=True)
 
 # Global index counter
