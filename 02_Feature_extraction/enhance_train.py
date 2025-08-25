@@ -41,7 +41,7 @@ main_folder_path = root_path / 'TTS4_easy_40-200'
 # feats_pickle_path_ex = main_folder_path / 'd_vectors_feats_2spk.pickle'
 feats_pickle_path_ex = main_folder_path / 'dvec_easy40-200.pickle'
 
-exp_name_ex = 'S1_sNorm'
+exp_name_ex = 'S1_easyN1'
 # exp_name_ex = 'S1_600_sc'
 run_params_ex = 'mask00_lr-5_ep180'
 
@@ -100,7 +100,7 @@ train_loader, test_loader, feature_dim, num_speakers = create_dataloaders(
 
 log_print(f"Feature Dimension: {feature_dim}, Number of Speakers: {num_speakers}")
 
-model = SimpleClassifier(dim=feature_dim, hidden_dim=128, num_classes=num_speakers).to(DEVICE)
+model = SimpleClassifier(dim=feature_dim, hidden_dim=256, num_classes=num_speakers).to(DEVICE)
 loss_function = nn.CrossEntropyLoss().to(DEVICE) 
 
 optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)

@@ -8,8 +8,8 @@ export EXP_NAME="EXP010"
 export DATASET_NAME="TestAO-Irma"
 
 export VAD_NAME="SHAS"
-export FEAT_NAME="DV"
-export METHOD_NAME="uH10NoEn"
+export FEAT_NAME="DV0"
+export METHOD_NAME="hdbCosb"
 
 ## Optional methods
 export DOUBLE_TALK_FLAG=true
@@ -31,7 +31,9 @@ export VAD_LOCATION="/home/luis/Dropbox/SpeechSpring2023/shas"
 ## Pretrained models used:
 export STG1_DT_PRETRAINED="${SRC_PATH}/pre-trained/best_overlap_detection_model_xvectors_May20.pth"
 export STG1_VAD_PRETRAINED="${VAD_LOCATION}/en_sfc_model_epoch-6.pth"
-export STG2_ENH_PRETRAINED="${SRC_PATH}/pre-trained/model_mask00_ep180_betaAug18_73.pth"
+# export STG2_ENH_PRETRAINED="${SRC_PATH}/pre-trained/model_S1_256_med_betaNO3_mask00_lr-5_ep180_73.pth"
+export STG2_ENH_PRETRAINED="${SRC_PATH}/pre-trained/model_S1_256_hard_betaNO4_mask00_lr-5_ep180_73.pth"
+# export STG2_ENH_PRETRAINED="${SRC_PATH}/pre-trained/model_S1_easyN1_mask00_lr-5_ep180_73.pth"
 
 ## Segmentation Parameters
 export seg_ln="1.0"
@@ -54,7 +56,9 @@ export STG1_FILTERED_CHUNKS_WAVS="${current_stg1}/wav_chunks_filtered"
 export current_stg2="${ROOT_PATH}/${DATASET_NAME}/STG_2/STG2_${EXP_NAME}-${VAD_NAME}-${FEAT_NAME}"
 
 export STG2_FEATS_PICKLE="${current_stg2}/${DATASET_NAME}_${VAD_NAME}_${FEAT_NAME}_feats.pickle"
-export STG2_FEATS_ENHANCED="${current_stg2}/${DATASET_NAME}_${VAD_NAME}_${FEAT_NAME}_featsEN-false.pickle"
+export STG2_FEATS_ENHANCED="${current_stg2}/${DATASET_NAME}_${VAD_NAME}_${FEAT_NAME}_featsEN.pickle"
+echo -e "STG2_FEATS_PICKLE: $STG2_FEATS_PICKLE"
+echo -e "STG2_FEATS_ENHANCED: $STG2_FEATS_ENHANCED"
 
 export ENHANCE_RUN_ID="skipped"
 

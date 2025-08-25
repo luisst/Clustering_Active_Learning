@@ -1,0 +1,192 @@
+
+
+0|0 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 15 	 m:manhattan,  
+>>>FAILED (n<3), 3
+
+
+1|0 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 15 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+2|0 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 15 	 m:manhattan, 
+n_clusters: 8 	percentage_assigned: 59.23%, 	silhouette_score: 0.0117
+
+
+3|0 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 15 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+4|0 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 20 	 m:manhattan, 
+n_clusters: 8 	percentage_assigned: 78.32%, 	silhouette_score: 0.1670
+
+
+5|0 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 20 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+6|0 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 20 	 m:manhattan, 
+n_clusters: 7 	percentage_assigned: 71.01%, 	silhouette_score: 0.1509
+
+
+7|0 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 20 	 m:cosine, 
+n_clusters: 4 	percentage_assigned: 87.87%, 	silhouette_score: 0.2720
+
+
+8|0 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 25 	 m:manhattan, 
+n_clusters: 9 	percentage_assigned: 69.67%, 	silhouette_score: 0.1093
+
+
+9|0 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 25 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+10|0 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 25 	 m:manhattan, 
+n_clusters: 6 	percentage_assigned: 74.13%, 	silhouette_score: 0.1549
+
+
+11|0 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 25 	 m:cosine, 
+n_clusters: 6 	percentage_assigned: 82.16%, 	silhouette_score: 0.2267
+
+
+12|1 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 15 	 m:manhattan, 
+n_clusters: 10 	percentage_assigned: 74.40%, 	silhouette_score: 0.1685
+
+
+13|1 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 15 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+14|1 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 15 	 m:manhattan,  
+>>>FAILED (n<3), 3
+
+
+15|1 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 15 	 m:cosine, 
+n_clusters: 7 	percentage_assigned: 73.24%, 	silhouette_score: 0.2152
+
+
+16|1 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 20 	 m:manhattan, 
+n_clusters: 10 	percentage_assigned: 72.79%, 	silhouette_score: 0.1075
+
+
+17|1 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 20 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+18|1 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 20 	 m:manhattan, 
+n_clusters: 8 	percentage_assigned: 68.60%, 	silhouette_score: 0.1412
+
+
+19|1 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 20 	 m:cosine, 
+n_clusters: 4 	percentage_assigned: 84.48%, 	silhouette_score: 0.2055
+
+
+20|1 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 25 	 m:manhattan, 
+n_clusters: 10 	percentage_assigned: 63.60%, 	silhouette_score: 0.0554
+
+
+21|1 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 25 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+22|1 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 25 	 m:manhattan, 
+n_clusters: 4 	percentage_assigned: 85.55%, 	silhouette_score: 0.2367
+
+
+23|1 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 25 	 m:cosine, 
+n_clusters: 11 	percentage_assigned: 67.71%, 	silhouette_score: 0.0127
+
+
+24|2 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 15 	 m:manhattan, 
+n_clusters: 4 	percentage_assigned: 88.67%, 	silhouette_score: 0.3458
+
+
+25|2 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 15 	 m:cosine,  
+>>>FAILED (n<3), 3
+
+
+26|2 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 15 	 m:manhattan, 
+n_clusters: 8 	percentage_assigned: 61.20%, 	silhouette_score: 0.0781
+
+
+27|2 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 15 	 m:cosine, 
+n_clusters: 7 	percentage_assigned: 71.36%, 	silhouette_score: 0.0887
+
+
+28|2 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 20 	 m:manhattan, 
+n_clusters: 6 	percentage_assigned: 87.24%, 	silhouette_score: 0.2432
+
+
+29|2 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 20 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+30|2 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 20 	 m:manhattan, 
+n_clusters: 5 	percentage_assigned: 77.25%, 	silhouette_score: 0.1232
+
+
+31|2 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 20 	 m:cosine, 
+n_clusters: 11 	percentage_assigned: 60.04%, 	silhouette_score: -0.0277
+
+
+32|2 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 25 	 m:manhattan, 
+n_clusters: 4 	percentage_assigned: 86.71%, 	silhouette_score: 0.3295
+
+
+33|2 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 25 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+34|2 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 25 	 m:manhattan,  
+>>>FAILED (n<3), 3
+
+
+35|2 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 25 	 m:cosine, 
+n_clusters: 5 	percentage_assigned: 80.91%, 	silhouette_score: 0.2667
+
+
+36|3 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 15 	 m:manhattan, 
+n_clusters: 8 	percentage_assigned: 73.06%, 	silhouette_score: 0.0778
+
+
+37|3 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 15 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+38|3 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 15 	 m:manhattan,  
+>>>FAILED (n<3), 3
+
+
+39|3 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 15 	 m:cosine, 
+n_clusters: 6 	percentage_assigned: 81.18%, 	silhouette_score: 0.2330
+
+
+40|3 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 20 	 m:manhattan,  
+>>>FAILED (n<3), 3
+
+
+41|3 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 20 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+42|3 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 20 	 m:manhattan, 
+n_clusters: 8 	percentage_assigned: 65.03%, 	silhouette_score: 0.1082
+
+
+43|3 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 20 	 m:cosine, 
+n_clusters: 8 	percentage_assigned: 70.38%, 	silhouette_score: 0.0245
+
+
+44|3 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 25 	 m:manhattan,  
+>>>FAILED (n<3), 3
+
+
+45|3 n_neighbors: 5 	 min_dist: 0.1 	 n_comp: 25 	 m:cosine,  
+>>>FAILED (n<3), 2
+
+
+46|3 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 25 	 m:manhattan, 
+n_clusters: 4 	percentage_assigned: 78.77%, 	silhouette_score: 0.2845
+
+
+47|3 n_neighbors: 10 	 min_dist: 0.1 	 n_comp: 25 	 m:cosine, 
+n_clusters: 7 	percentage_assigned: 77.25%, 	silhouette_score: 0.2132

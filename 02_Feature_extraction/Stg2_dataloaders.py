@@ -309,6 +309,7 @@ class DataAugmentor:
             Masked features
         """
         mask = torch.rand_like(features) > self.mask_prob
+
         return features * mask.float()
     
     def augment(self, features, apply_noise=True, apply_mask=True):

@@ -9,8 +9,10 @@ import warnings
 import argparse
 import re
 import pickle
+import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
 import umap
 
@@ -35,13 +37,13 @@ def valid_path(path):
     else:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
-feats_pickle_ex = Path('/home/luis/Dropbox/DATASETS_AUDIO/Proposal_runs/TestAO-Liz/STG2_EXP001-SHAS-DV/TestAO-Liz_SHAS_DV_feats.pkl')
-output_folder_path_ex = Path('/home/luis/Dropbox/DATASETS_AUDIO/Proposal_runs/littleTest')
+feats_pickle_ex = Path('/home/luis/Dropbox/DATASETS_AUDIO/Unsupervised_Pipeline/TestAO-Irma/STG_2/STG2_EXP010-SHAS-DV2/TestAO-Irma_SHAS_DV2_featsEN-false.pickle')
+output_folder_path_ex = Path('/home/luis/Dropbox/DATASETS_AUDIO/Unsupervised_Pipeline/dv2')
 run_params_ex = f"pca{pca_elem}_mcs{min_cluster_size}_ms{min_samples}_{hdb_mode}"
-Exp_name_ex = 'TestAO-Liz_SHAS_DV'
+Exp_name_ex = 'TestAO-IrmaR'
 
-pred_lbl_pickle_ex = Path('/home/luis/Dropbox/DATASETS_AUDIO/Proposal_runs/littleTest/TestAO-Liz_SHAS_DV_predlbl.pickle')
-pred_reduced_feats_ex = Path('/home/luis/Dropbox/DATASETS_AUDIO/Proposal_runs/littleTest/TestAO-Liz_SHAS_DV_reduced_feats.pickle')
+pred_lbl_pickle_ex = output_folder_path_ex / 'predlbl.pickle'
+pred_reduced_feats_ex = output_folder_path_ex / 'reduced_feats.pickle'
 
 
 parser = argparse.ArgumentParser()
@@ -96,31 +98,56 @@ hdb_data_input = None
 # else:
 #     hdb_data_input = run_pca(Mixed_X_data, pca_elem) 
 
-n_components = 15
+n_components = 20
 data_standardized = StandardScaler().fit_transform(Mixed_X_data)
+
+# comp20, neigh5, manhattan
+# comp20, neigh10, cosine 
 
 # Apply UMAP
 umap_reducer = umap.UMAP(
-    n_neighbors=5,  # Adjust based on dataset size
+    n_neighbors=10,  # Adjust based on dataset size
     min_dist=0.1,    # Controls compactness of clusters
     n_components=n_components,  # Reduced dimensionality
-    metric='cosine',  # Good default for many feature types
+    metric='cosine'  # Good default for many feature types
+    # random_state=42
 )
 hdb_data_input = umap_reducer.fit_transform(data_standardized)
 
+# Use PCA to plot 2D from UMAP features
+pca = PCA(n_components=2)
+hdb_data_input_2d = pca.fit_transform(hdb_data_input)
+
+# Plot and store the hdb_data_input_2d
+plt.figure(figsize=(10, 8))
+plt.scatter(hdb_data_input_2d[:, 0], hdb_data_input_2d[:, 1], s=5)
+plt.title("HDBSCAN Clustering (2D Projection)")
+plt.xlabel("PCA Component 1")
+plt.ylabel("PCA Component 2")
+plt.grid()
+plt.savefig(f"{output_folder_path}/{current_run_id}_umap_2d.png")
+plt.close()
+
+
 ### try cluster_selection_method = 'leaf' | default = 'eom'
-hdb = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,\
-                        min_samples=min_samples,\
-                    cluster_selection_method = hdb_mode).fit(hdb_data_input)
+# hdb = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,\
+#                         min_samples=min_samples,\
+#                     cluster_selection_method = hdb_mode).fit(hdb_data_input)
+
+hdb = hdbscan.HDBSCAN(min_cluster_size=25,\
+                        min_samples=5,\
+                    cluster_selection_method = 'eom').fit(hdb_data_input)
 
 samples_outliers = hdb.outlier_scores_
 samples_prob = hdb.probabilities_
 samples_label = hdb.labels_
 
-if check_0_clusters(samples_prob, samples_label, verbose = False):
+print(set(samples_label))
+
+if check_0_clusters(samples_prob, samples_label, verbose = True):
     print(f'0 clusters: {current_run_id}')
 
-df_mixed = gen_tsne(Mixed_X_data, Mixed_y_labels)
+df_mixed = gen_tsne(hdb_data_input, Mixed_y_labels)
 x_tsne_2d = np.array(list(zip(df_mixed['tsne-2d-one'], df_mixed['tsne-2d-two'])))
 
 with open(str(pred_reduced_feats), 'wb') as handle:
@@ -149,4 +176,4 @@ plot_clustering_dual(x_tsne_2d, Mixed_y_labels,
                         plot_mode)
 
 
-organize_samples_by_label(Mixed_X_paths, samples_label, samples_prob, output_folder_path)
+# organize_samples_by_label(Mixed_X_paths, samples_label, samples_prob, output_folder_path)

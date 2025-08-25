@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 
 
-def check_0_clusters(samples_prob, samples_label, verbose = False):
+def check_0_clusters(samples_prob, samples_label, verbose = True):
     # print number of clusters:
     non_zero_count =np.count_nonzero(samples_prob)
     unique_labels = set(samples_label)
@@ -28,10 +28,11 @@ def gen_tsne(Mixed_X_data, Mixed_y_labels,
              perplexity_val = 15, n_iter = 900,
              n_comp = 108):
     
-    if n_comp == 0:
+    if (n_comp == 0) or(n_comp > Mixed_X_data.shape[1]):
         tsne = TSNE(n_components=2, verbose=False, perplexity=perplexity_val, n_iter=n_iter)
         tsne_results = tsne.fit_transform(Mixed_X_data)
         print(f'PCA before t-snePRE skipped')
+    
     else:
         data_standardized = StandardScaler().fit_transform(Mixed_X_data)
         # Numbers to try: 16, 75, 108

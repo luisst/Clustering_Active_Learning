@@ -80,39 +80,39 @@ else
 fi
 
 
-## Join the predictions chunks into a merged wav files
-echo -e "\n\t>>>>> Stage 3d: Merged WAVs $STG3_MERGED_WAVS\n"
-if [ ! ${SKIP_merged} = true ]; then
-    python3 ${SRC_PATH}/03_Clustering_TDA/Stg3d_merge_wavs.py --stg1_long_wavs $STG1_WAVS\
-    --stg3_pred_folders $STG3_HDBSCAN_PRED_OUTPUT --stg3_separated_wavs $STG3_SEPARATED_WAVS\
-    --stg3_merged_wavs $STG3_MERGED_WAVS --stg3_outliers $STG3_OUTLIERS_WAVS\
-    --ln $seg_ln --st $step_size --gap $gap_size --consc_th $consc_th
+# ## Join the predictions chunks into a merged wav files
+# echo -e "\n\t>>>>> Stage 3d: Merged WAVs $STG3_MERGED_WAVS\n"
+# if [ ! ${SKIP_merged} = true ]; then
+#     python3 ${SRC_PATH}/03_Clustering_TDA/Stg3d_merge_wavs.py --stg1_long_wavs $STG1_WAVS\
+#     --stg3_pred_folders $STG3_HDBSCAN_PRED_OUTPUT --stg3_separated_wavs $STG3_SEPARATED_WAVS\
+#     --stg3_merged_wavs $STG3_MERGED_WAVS --stg3_outliers $STG3_OUTLIERS_WAVS\
+#     --ln $seg_ln --st $step_size --gap $gap_size --consc_th $consc_th
 
-    # Check if the Python script was successful
-    if [ $? -ne 0 ]; then
-        export MOVE_ON=false
-        echo "Move on: $MOVE_ON"
-        return 1
-    fi
-else
-    echo -e "\n\t>>>>> Stage 3d: Merged WAVs skipped\n"
-fi
+#     # Check if the Python script was successful
+#     if [ $? -ne 0 ]; then
+#         export MOVE_ON=false
+#         echo "Move on: $MOVE_ON"
+#         return 1
+#     fi
+# else
+#     echo -e "\n\t>>>>> Stage 3d: Merged WAVs skipped\n"
+# fi
 
 
 
-## Create the final csv file
-echo -e "\n\t>>>>> Stage 3e: Output Final CSV prediction $STG3_FINAL_CSV\n"
-if [ ! ${SKIP_STG3e} = true ]; then
-    python3 ${SRC_PATH}/03_Clustering_TDA/Stg3e_create_csv_from_merged.py --stg3_merged_wavs $STG3_MERGED_WAVS\
-    --stg3_final_csv $STG3_FINAL_CSV --stg3_separated_merged_wavs $STG3_SEPARATED_MERGED_WAVS
+# ## Create the final csv file
+# echo -e "\n\t>>>>> Stage 3e: Output Final CSV prediction $STG3_FINAL_CSV\n"
+# if [ ! ${SKIP_STG3e} = true ]; then
+#     python3 ${SRC_PATH}/03_Clustering_TDA/Stg3e_create_csv_from_merged.py --stg3_merged_wavs $STG3_MERGED_WAVS\
+#     --stg3_final_csv $STG3_FINAL_CSV --stg3_separated_merged_wavs $STG3_SEPARATED_MERGED_WAVS
 
-    # Check if the Python script was successful
-    if [ $? -ne 0 ]; then
-        export MOVE_ON=false
-        echo "Move on: $MOVE_ON"
-        return 1
-    fi
-else
-    echo -e "\n\t>>>>> Stage 3e: Final CSV prediction skipped\n"
-fi
+#     # Check if the Python script was successful
+#     if [ $? -ne 0 ]; then
+#         export MOVE_ON=false
+#         echo "Move on: $MOVE_ON"
+#         return 1
+#     fi
+# else
+#     echo -e "\n\t>>>>> Stage 3e: Final CSV prediction skipped\n"
+# fi
 

@@ -125,7 +125,7 @@ class background_resnet(nn.Module):
         return spk_embedding
 
 class SimpleClassifier(nn.Module):
-    def __init__(self, dim=256, hidden_dim=128, num_classes=2, dropout_rate=0.4):
+    def __init__(self, dim=256, hidden_dim=128, num_classes=2, dropout_rate=0.2):
         super().__init__()
         self.fc1 = nn.Linear(dim, hidden_dim)
         self.bn1 = nn.BatchNorm1d(hidden_dim)

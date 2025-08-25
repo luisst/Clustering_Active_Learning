@@ -72,7 +72,7 @@ log_print(f"Using pretrained model: {model_pretrained_path}", lp=log_path)
 
 inference_loader, pickle_labels, wavs_paths, feature_dim, num_speakers_dataloader = inference_dataloader(inference_feats_pickle_path, batch_size=batch_size, num_workers=num_workers)
 
-model = SimpleClassifier(dim=feature_dim, hidden_dim=128, num_classes=number_speakers_pretrained).to(DEVICE)
+model = SimpleClassifier(dim=feature_dim, hidden_dim=256, num_classes=number_speakers_pretrained).to(DEVICE)
 
 checkpoint = torch.load(model_pretrained_path)
 model.load_state_dict(checkpoint)
