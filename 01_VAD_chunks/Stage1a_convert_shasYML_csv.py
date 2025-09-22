@@ -1,9 +1,7 @@
 import argparse
 from pathlib import Path
 import re
-import pdb
 
-# Print current working directory
 import os
 from pipeline_utilities import log_print, valid_path
 

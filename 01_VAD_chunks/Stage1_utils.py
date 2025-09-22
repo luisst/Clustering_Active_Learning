@@ -1,5 +1,7 @@
 from pathlib import Path
 from pyannote.core import Annotation, Segment
+import sys
+import re
 
 def vad_format(current_transcript_pth):
     # Src	StartTime	EndTime
@@ -126,5 +128,3 @@ def inaSS_format(current_transcript_pth):
             hypothesis[Segment(float(start_time), float(stop_time))] = 'speech'
     
     return hypothesis
-
-

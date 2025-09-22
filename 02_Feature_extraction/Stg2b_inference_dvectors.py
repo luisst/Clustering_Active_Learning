@@ -31,12 +31,14 @@ wavs_folder_ex = root_ex / Path('Dvectors/TTS4_easy_40-200/input_wavs')
 mfcc_folder_ex = root_ex / Path('Dvectors/TTS4_easy_40-200/input_feats')
 feats_pickle_ex = mfcc_folder_ex.parent / Path('dvec_easy40-200.pickle')
 pretrained_path_ex = root_ex.parent / 'Source_2025' / 'pre-trained' / f'checkpoint_100_original_5994.pth'
+use_pkl_label_ex = False
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--wavs_folder', type=valid_path, default=wavs_folder_ex, help='Path to the folder to input chunks wavs paths')
 parser.add_argument('--input_mfcc_folder', type=valid_path, default=mfcc_folder_ex, help='Path to the folder to load the mfcc feats')
 parser.add_argument('--output_feats_pickle', default=feats_pickle_ex, help='Path to the folder to store the D-vectors features')
 parser.add_argument('--pretrained_model_path', default=pretrained_path_ex, help='Path to pretrained Dvector model')
+parser.add_argument('--use_pkl_label', default=use_pkl_label_ex, help='Use pickle label for speaker ID extraction')
 args = parser.parse_args()
 
 #TODO: samples_flag is set to True by default for inferences
@@ -44,11 +46,14 @@ args = parser.parse_args()
 wavs_folder = Path(args.wavs_folder)
 mfcc_folder_path = Path(args.input_mfcc_folder)
 feats_pickle_path = Path(args.output_feats_pickle)
+use_pkl_label = args.use_pkl_label
 
 
 pretrained_path = Path(args.pretrained_model_path)
 
 percentage_test = 0.0
+
+print(f'Using pickle label: {use_pkl_label}')
 
 dataset_dvectors = d_vectors_pretrained_model(mfcc_folder_path, percentage_test,
                                             wavs_folder,
@@ -56,7 +61,7 @@ dataset_dvectors = d_vectors_pretrained_model(mfcc_folder_path, percentage_test,
                                             return_paths_flag = True,
                                             norm_flag = True,
                                             use_cuda=True,
-                                            samples_flag=False)
+                                            use_pkl_label=use_pkl_label)
 
 X_train = dataset_dvectors[0]
 y_train = dataset_dvectors[1]
@@ -71,6 +76,9 @@ X_train = X_train.cpu().numpy()
 
 Mixed_X_data = X_train
 Mixed_y_labels = y_train
+
+sample_path = X_train_paths[0]
+print(f'Example path: {sample_path}, type: {type(sample_path)}')
 
 X_data_and_labels = [X_train, X_train_paths, y_train]
 with open(f'{feats_pickle_path}', "wb") as file:

@@ -1,7 +1,7 @@
 from pathlib import Path
 import argparse
 
-from pipeline_utilities import valid_path, ffmpeg_split_audio
+from pipeline_utilities import valid_path, ffmpeg_split_audio, log_print
 
 
 base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','TestAO-Liz')
@@ -17,7 +17,9 @@ parser.add_argument('--stg1_final_csv', type=valid_path, default=csv_folder_ex, 
 parser.add_argument('--stg1_chunks_wavs', type=valid_path, default=chunks_WAV_ex, help='Stg2 chunks wavs folder path')
 parser.add_argument('--ln', type=float, default=seg_ln_ex, help='Stg2 chunks length ihn seconds')
 parser.add_argument('--st', type=float, default=step_size_ex, help='Stg2 chunks step_size in seconds')
+parser.add_argument('--min_overlap_pert',type=float, default=0.0, help='Minimum overlap percentage for the metric calculation')
 parser.add_argument('--azure_flag', type=bool, default=False, help='Flag to indicate csv line columns')
+parser.add_argument('--GT_folder_path', default=None, help='Ground Truth CSV folder path')
 
 args = parser.parse_args()
 
@@ -25,12 +27,29 @@ audio_folder = args.stg1_wavs
 csv_folder = args.stg1_final_csv
 chunks_wav_folder = args.stg1_chunks_wavs
 azure_flag = args.azure_flag
+GT_folder_path = args.GT_folder_path
+min_overlap_percentage = float(args.min_overlap_pert)
+
+
+
+if GT_folder_path is not None:
+    GT_folder_path = Path(GT_folder_path)
+    if not GT_folder_path.exists():
+        raise ValueError(f'GT_folder_path: {GT_folder_path} does not exist')
+    GT_flag = True
+else:
+    GT_flag = False
 
 chunk_duration = float(args.ln)
 minimum_chunk_duration = chunk_duration - 0.1 # seconds
 step_length = float(args.st) 
 verbose = True
 
+print(f'chunk_duration: {chunk_duration}')
+print(f'step_size: {step_length}')
+print(f'Azureflag: {azure_flag}')
+print(f'Minimum overlap percentage: {min_overlap_percentage}')
+print(f'GT folder path: {GT_folder_path}')
 
 # Iterate through each of the csv files
 for csv_file in csv_folder.glob('*.txt'):
@@ -84,8 +103,30 @@ for csv_file in csv_folder.glob('*.txt'):
                     print(f'\tBREAK\t Last iteration: {current_stop_time - current_time:.2f} < {minimum_chunk_duration:.2f}\n')
                 break
 
+            # Speaker ID
+            speaker_id = f'spkX'
+
+            # If GT folder path is provided, check if the current chunk overlaps with any GT segment
+            if GT_flag:
+                GT_wav_file_path = GT_folder_path.joinpath(f'{csv_filename}_GT.csv')
+                # Read GT from tab-separated csv file with colums: speaker_id, lang, start_time, stop_time
+                GT_segments = []
+                for gt_line in GT_wav_file_path.open():
+                    gt_speaker, gt_lang, gt_start, gt_stop = gt_line.split('\t')
+                    GT_segments.append((gt_speaker, float(gt_start), float(gt_stop)))
+            
+                # Check for overlap
+                for gt_speaker, gt_start, gt_stop in GT_segments:
+                    overlap = max(0, min(current_stop_time, gt_stop) - max(current_time, gt_start))
+                    overlap_ratio = overlap / (current_stop_time - current_time)
+                    if overlap_ratio >= min_overlap_percentage:
+                        log_print(f'\tOverlap with GT: {current_time:.2f} - {current_stop_time:.2f}')
+                        speaker_id = gt_speaker
+                        break
+
+
             # Create the output file name
-            output_filename = f'{csv_filename}_{current_time:.2f}_{current_stop_time:.2f}.wav'
+            output_filename = f'{csv_filename}_{speaker_id}_{current_time:.2f}_{current_stop_time:.2f}.wav'
             output_file = chunks_wav_folder.joinpath(output_filename)
 
             if verbose:

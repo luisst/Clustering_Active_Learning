@@ -5,11 +5,12 @@ export ROOT_PATH="/home/luis/Dropbox/DATASETS_AUDIO/Unsupervised_Pipeline"
 export SRC_PATH=$(pwd)
 
 export EXP_NAME="EXP010"
-export DATASET_NAME="TestAO-Irma"
+export DATASET_NAME="TTS4_easy"
 
 export VAD_NAME="SHAS"
-export FEAT_NAME="DV0"
-export METHOD_NAME="hdbCosb"
+export FEAT_NAME="DV"
+export METHOD_NAME="hdb"
+export AZURE_FLAG=false
 
 ## Optional methods
 export DOUBLE_TALK_FLAG=true
@@ -25,12 +26,14 @@ else
 fi
 echo -e "predict_only: $PREDICT_ONLY"
 
+export USE_PKL_LABEL=true
+
 ## External Repositories used
 export VAD_LOCATION="/home/luis/Dropbox/SpeechSpring2023/shas"
 
 ## Pretrained models used:
 export STG1_DT_PRETRAINED="${SRC_PATH}/pre-trained/best_overlap_detection_model_xvectors_May20.pth"
-export STG1_VAD_PRETRAINED="${VAD_LOCATION}/en_sfc_model_epoch-6.pth"
+export STG1_VAD_PRETRAINED="${VAD_LOCATION}/en_sfc_model_epoch-6.pt"
 # export STG2_ENH_PRETRAINED="${SRC_PATH}/pre-trained/model_S1_256_med_betaNO3_mask00_lr-5_ep180_73.pth"
 export STG2_ENH_PRETRAINED="${SRC_PATH}/pre-trained/model_S1_256_hard_betaNO4_mask00_lr-5_ep180_73.pth"
 # export STG2_ENH_PRETRAINED="${SRC_PATH}/pre-trained/model_S1_easyN1_mask00_lr-5_ep180_73.pth"
@@ -40,6 +43,7 @@ export seg_ln="1.0"
 export step_size="0.3"
 export gap_size="0.4"
 export consc_th="1"
+export min_overlap_percentage="0.3"
 
 export DT_THRESHOLD="0.8"
 
@@ -50,7 +54,7 @@ export current_stg1="${ROOT_PATH}/${DATASET_NAME}/STG_1/STG1_${VAD_NAME}"
 export STG1_WAVS="${ROOT_PATH}/${DATASET_NAME}/input_wavs/"
 export STG1_FILTERED_CHUNKS_WAVS="${current_stg1}/wav_chunks_filtered"
 
-# source ./BB_Stages_bash/STG1_SHAS.sh
+source ./BB_Stages_bash/STG1_SHAS.sh
 
 #### Stage 2 Feature Extraction
 export current_stg2="${ROOT_PATH}/${DATASET_NAME}/STG_2/STG2_${EXP_NAME}-${VAD_NAME}-${FEAT_NAME}"
@@ -62,7 +66,7 @@ echo -e "STG2_FEATS_ENHANCED: $STG2_FEATS_ENHANCED"
 
 export ENHANCE_RUN_ID="skipped"
 
-if [ "$MOVE_ON" = true ]; then
+if [ "$MOVE_ON" = "true" ]; then
 source ./BB_Stages_bash/STG2_DVECTORS_ENHANCER.sh
 fi
 
@@ -79,10 +83,10 @@ export min_samples="5"
 
 export RUN_PARAMS="pca${pca_elem}_mcs${min_cluster_size}_ms${min_samples}_${hdb_mode}"
 
-cd $SRC_PATH
-if [ "$MOVE_ON" = true ]; then
-source ./BB_Stages_bash/STG3_META_HDB.sh
-fi
+# cd $SRC_PATH
+# if [ "$MOVE_ON" = "true" ]; then
+# source ./BB_Stages_bash/STG3_META_HDB.sh
+# fi
 
 
 # #### Stage 4 Metrics
@@ -95,7 +99,7 @@ fi
 
 
 # cd $SRC_PATH
-# if [ "$MOVE_ON" = true ]; then
+# if [ "$MOVE_ON" = "true" ]; then
 #     source STG4_ENTROPY.sh
 # fi
 

@@ -391,11 +391,8 @@ def extract_MFB_aolme(current_input_path, output_feats_folder):
     curent_output_path = output_feats_folder / (current_input_path.stem + '.pkl')
 
     # Verify curent_input_path has 3 substrings separated by '_'
-    current_label = 0
-    if len(current_input_path.stem.split('_')) == 3:
-        current_label = current_input_path.stem.split('_')[-2]
-    else:
-        current_label = 99
+    current_label = current_input_path.stem.split('_')[-3]
+
     
     print(f'current_label: {current_label}')
         
@@ -433,8 +430,6 @@ def get_d_vector_aolme(filename, model, use_cuda = True, norm_flag = False):
     input = feat_and_label['feat'] # size : (n_frames, dim=40)
     label = feat_and_label['label']
 
-    label = torch.tensor([1]).cuda()
-
     input = normalize_frames(input, Scale=USE_SCALE)
     TT = ToTensorTestInput()  # torch tensor:(1, n_dims, n_frames)
     input = TT(input)  # size : (n_frames, 1, n_filter, T)
@@ -443,7 +438,6 @@ def get_d_vector_aolme(filename, model, use_cuda = True, norm_flag = False):
         if use_cuda:
             #load gpu
             input = input.cuda()
-            label = label.cuda()
 
         activation = model(input) #scoring function is cosine similarity so, you don't need to normalization
 
@@ -454,18 +448,11 @@ def get_d_vector_aolme(filename, model, use_cuda = True, norm_flag = False):
 
     return result_tensor, label
 
-def extract_label(filename, samples_flag=True):
-
-    if samples_flag:
-        return '0'
-
-    speaker_id = filename.stem.split('_')[-2]  # Extract speaker ID from filename
-    return speaker_id
 
 def d_vector_dict_lbls(list_of_feats, model, 
                        list_of_wavs,
-                       norm_flag = False, samples_flag = True):
-    
+                       norm_flag = False, use_pkl_label = False):
+
     if len(list_of_feats) != len(list_of_wavs):
         sys.exit('Error! Length of list_of_feats and wavs_paths are not the same')
 
@@ -473,8 +460,11 @@ def d_vector_dict_lbls(list_of_feats, model,
     label_dict = {}
     with torch.no_grad():
         for path_idx, current_feat_path in enumerate(list_of_feats):
-            enroll_embedding, _ = get_d_vector_aolme(current_feat_path, model, norm_flag=norm_flag)
-            speakerID_clusters = extract_label(current_feat_path, samples_flag=samples_flag)
+            enroll_embedding, pkl_label = get_d_vector_aolme(current_feat_path, model, norm_flag=norm_flag)
+            if use_pkl_label:
+                speakerID_clusters = pkl_label
+            else:
+                speakerID_clusters = 0
 
             # Get the current wav path
             current_wav_path = list_of_wavs[path_idx]
@@ -508,7 +498,7 @@ def convert_dict_to_tensor(dict_data_input):
             for current_tuple in tensor_and_path:
                 concatenated_tensor = torch.cat((concatenated_tensor, current_tuple[0]), dim=0)
                 # data_list.append()
-                path_list.append(current_tuple[1])
+                path_list.append(str(current_tuple[1]))
 
     # # Concatenate the tensors in data_list along the first dimension (rows)
     # if len(data_list) != 0:
@@ -621,7 +611,7 @@ def d_vectors_pretrained_model(feats_folder, percentage_test,
                                return_paths_flag = False,
                                norm_flag = False,
                                use_cuda=True,
-                               samples_flag=True , verbose = False):
+                               use_pkl_label=False , verbose = False):
 
     list_of_feats = sorted(list(feats_folder.glob('*.pkl')))
     list_of_wavs = sorted(list(wavs_paths.glob('*.wav')))
@@ -636,7 +626,7 @@ def d_vectors_pretrained_model(feats_folder, percentage_test,
 
     dict_embeddings = d_vector_dict_lbls(list_of_feats, model,
                                          list_of_wavs,
-                                         norm_flag=norm_flag, samples_flag=samples_flag)
+                                         norm_flag=norm_flag, use_pkl_label=use_pkl_label)
 
 
     return separate_dict_embeddings(dict_embeddings, 

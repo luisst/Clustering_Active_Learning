@@ -18,7 +18,8 @@ import umap
 
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-from clustering_utils import gen_tsne, check_0_clusters, plot_clustering_dual, organize_samples_by_label 
+from clustering_utils import gen_tsne, check_number_clusters, plot_clustering_dual, organize_samples_by_label,\
+    membership_curve, n_clusters_curve
 
 
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
@@ -103,49 +104,47 @@ data_standardized = StandardScaler().fit_transform(Mixed_X_data)
 
 # comp20, neigh5, manhattan
 # comp20, neigh10, cosine 
+best_score_hdb = -1
+hdb_data_input = None
+hdb_selected = None
 
-# Apply UMAP
-umap_reducer = umap.UMAP(
-    n_neighbors=10,  # Adjust based on dataset size
-    min_dist=0.1,    # Controls compactness of clusters
-    n_components=n_components,  # Reduced dimensionality
-    metric='cosine'  # Good default for many feature types
-    # random_state=42
-)
-hdb_data_input = umap_reducer.fit_transform(data_standardized)
+for repetition_idx in range(4):
+    # Apply UMAP
+    umap_reducer = umap.UMAP(
+        n_neighbors=10,  # Adjust based on dataset size
+        min_dist=0.1,    # Controls compactness of clusters
+        n_components=n_components,  # Reduced dimensionality
+        metric='cosine'  # Good default for many feature types
+        # random_state=42
+    )
+    hdb_data_input_candidate = umap_reducer.fit_transform(data_standardized)
 
-# Use PCA to plot 2D from UMAP features
-pca = PCA(n_components=2)
-hdb_data_input_2d = pca.fit_transform(hdb_data_input)
+    ## try cluster_selection_method = 'leaf' | default = 'eom'
+    hdb_candidate = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,\
+                            min_samples=min_samples,\
+                        cluster_selection_method = hdb_mode).fit(hdb_data_input_candidate)
 
-# Plot and store the hdb_data_input_2d
-plt.figure(figsize=(10, 8))
-plt.scatter(hdb_data_input_2d[:, 0], hdb_data_input_2d[:, 1], s=5)
-plt.title("HDBSCAN Clustering (2D Projection)")
-plt.xlabel("PCA Component 1")
-plt.ylabel("PCA Component 2")
-plt.grid()
-plt.savefig(f"{output_folder_path}/{current_run_id}_umap_2d.png")
-plt.close()
+    n_clusters, membership_percentage = check_number_clusters(hdb_candidate.probabilities_, hdb_candidate.labels_, verbose = True)
 
+    if n_clusters < 3:
+        print(f'Skipping repetition {repetition_idx} due to insufficient clusters: {n_clusters}')
+        continue
 
-### try cluster_selection_method = 'leaf' | default = 'eom'
-# hdb = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,\
-#                         min_samples=min_samples,\
-#                     cluster_selection_method = hdb_mode).fit(hdb_data_input)
+    current_hdb_score = n_clusters_curve(n_clusters)/2 + membership_curve(membership_percentage)/2
 
-hdb = hdbscan.HDBSCAN(min_cluster_size=25,\
-                        min_samples=5,\
-                    cluster_selection_method = 'eom').fit(hdb_data_input)
+    print(f'{repetition_idx} Current HDB score: {current_hdb_score}')
 
-samples_outliers = hdb.outlier_scores_
-samples_prob = hdb.probabilities_
-samples_label = hdb.labels_
+    if current_hdb_score > best_score_hdb:
+        best_score_hdb = current_hdb_score
+        hdb_data_input = hdb_data_input_candidate
+        hdb_selected = hdb_candidate
 
-print(set(samples_label))
+if hdb_selected is None:
+    sys.exit("No valid HDBSCAN model found.")
 
-if check_0_clusters(samples_prob, samples_label, verbose = True):
-    print(f'0 clusters: {current_run_id}')
+samples_outliers = hdb_selected.outlier_scores_
+samples_prob = hdb_selected.probabilities_
+samples_label = hdb_selected.labels_
 
 df_mixed = gen_tsne(hdb_data_input, Mixed_y_labels)
 x_tsne_2d = np.array(list(zip(df_mixed['tsne-2d-one'], df_mixed['tsne-2d-two'])))
@@ -175,5 +174,18 @@ plot_clustering_dual(x_tsne_2d, Mixed_y_labels,
                         current_run_id, output_folder_path,
                         plot_mode)
 
+# Use PCA to plot 2D from UMAP features
+pca = PCA(n_components=2)
+hdb_data_input_2d = pca.fit_transform(hdb_data_input)
+
+# Plot and store the hdb_data_input_2d
+plt.figure(figsize=(10, 8))
+plt.scatter(hdb_data_input_2d[:, 0], hdb_data_input_2d[:, 1], s=5)
+plt.title("HDBSCAN Clustering (2D Projection)")
+plt.xlabel("PCA Component 1")
+plt.ylabel("PCA Component 2")
+plt.grid()
+plt.savefig(f"{output_folder_path}/{current_run_id}_umap_2d.png")
+plt.close()
 
 # organize_samples_by_label(Mixed_X_paths, samples_label, samples_prob, output_folder_path)

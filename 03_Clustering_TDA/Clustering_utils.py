@@ -10,19 +10,104 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 
+def membership_curve(w, slope_plateau=0.01, sharpness=1.5, H=1.0):
+    """
+    Generate a curve in [0,100]:
+      - Near 0 until ~40
+      - Rise until ~60
+      - Consistent linear slope 60-85
+      - Gradual drop to almost 0 by 95%
+    
+    Parameters
+    ----------
+    w : float or array-like
+        Input values in [0,100].
+    slope_plateau : float
+        Linear slope for the plateau region (rise per unit w).
+    sharpness : float
+        Controls how sharp the rise/drop transitions are (lower = sharper).
+    H : float
+        Peak height scaling.
+    """
+    w = np.asarray(w, dtype=float)
+    
+    # Smooth step-up from 40 to 60
+    rise = 1 / (1 + np.exp(-(w-60)/sharpness))   # sigmoid centered at 50
+    
+    # More gradual step-down starting from 95, nearly zero by 100%
+    fall = 1 / (1 + np.exp((w-95)/2.0))    # gentler sigmoid centered at 95 
+    
+    # Base curve from rise and fall
+    base = rise * fall
 
-def check_0_clusters(samples_prob, samples_label, verbose = True):
+    # Create consistent linear slope in plateau region (60-100)
+    plateau_mask = (w >= 60) & (w <= 100)
+    slope_adjustment = np.ones_like(w)
+    
+    # Add linear slope only in plateau region
+    slope_adjustment[plateau_mask] = 1 + slope_plateau * (w[plateau_mask] - 60)
+    
+    y = H * base * slope_adjustment
+    
+    # substract a constant of 0.25
+    y -= 0.25
+    
+    return y
+
+def n_clusters_curve(k, a=0.3, m=6, b=40, H=1.0):
+    """
+    Generate a non-negative right-skewed hump-shaped curve.
+    
+    Parameters
+    ----------
+    k : int or array-like
+        Input value(s). k should be >= 0.
+    a : float
+        Controls steepness of the rise before the peak.
+    m : float
+        Location of the peak (mode).
+    b : float
+        Controls the rate of decay after the peak.
+    H : float
+        Peak height (scaling factor).
+
+    Returns
+    -------
+    y : float or ndarray
+        Value(s) of the curve at k.
+    """
+    k = np.asarray(k, dtype=float)
+    y = np.zeros_like(k, dtype=float)
+    
+    mask = k > 0
+    
+    # Modified formula to ensure peak is always at k=m
+    # Use different behavior before and after the peak
+    before_peak = (k <= m) & mask
+    after_peak = (k > m) & mask
+    
+    # Before peak: power function
+    if np.any(before_peak):
+        y[before_peak] = H * (k[before_peak] / m) ** a
+    
+    # After peak: exponential decay
+    if np.any(after_peak):
+        y[after_peak] = H * np.exp(-(k[after_peak] - m) / b)
+    
+    return y
+
+def check_number_clusters(samples_prob, hdb_labels, verbose = True):
     # print number of clusters:
-    non_zero_count =np.count_nonzero(samples_prob)
-    unique_labels = set(samples_label)
-    if verbose:
-        print(f'Number of clusters: {len(unique_labels) - 1}')
-        print(f'hdb probs \t min: {min(samples_prob)} \t max: {max(samples_prob)} \t non_zero: {non_zero_count}')
 
-    if non_zero_count == 0:
-        return True
-    else:
-        return False
+    n_clusters = len(set(hdb_labels)) - (1 if -1 in hdb_labels else 0)  # Exclude noise label (-1)
+    n_samples = len(hdb_labels)
+    n_assigned = len(hdb_labels[hdb_labels != -1])
+    membership_percentage = (n_assigned / n_samples) * 100
+
+    if verbose:
+        print(f'Number of clusters: {n_clusters}')
+
+    return n_clusters, membership_percentage
 
 def gen_tsne(Mixed_X_data, Mixed_y_labels,
              perplexity_val = 15, n_iter = 900,
