@@ -27,18 +27,18 @@ audio_folder = args.stg1_wavs
 csv_folder = args.stg1_final_csv
 chunks_wav_folder = args.stg1_chunks_wavs
 azure_flag = args.azure_flag
-GT_folder_path = args.GT_folder_path
+GT_folder_path = Path(args.GT_folder_path)
 min_overlap_percentage = float(args.min_overlap_pert)
 
-
-
-if GT_folder_path is not None:
-    GT_folder_path = Path(GT_folder_path)
-    if not GT_folder_path.exists():
-        raise ValueError(f'GT_folder_path: {GT_folder_path} does not exist')
-    GT_flag = True
-else:
+# Verify GT folder path exists in the OS
+if not GT_folder_path.exists():
     GT_flag = False
+    GT_folder_path = 'No GT folder provided'
+    print('No GT folder provided')
+else:
+    GT_folder_path = Path(GT_folder_path)
+    GT_flag = True
+    print(f'GT folder path: {GT_folder_path}')
 
 chunk_duration = float(args.ln)
 minimum_chunk_duration = chunk_duration - 0.1 # seconds
@@ -49,7 +49,6 @@ print(f'chunk_duration: {chunk_duration}')
 print(f'step_size: {step_length}')
 print(f'Azureflag: {azure_flag}')
 print(f'Minimum overlap percentage: {min_overlap_percentage}')
-print(f'GT folder path: {GT_folder_path}')
 
 # Iterate through each of the csv files
 for csv_file in csv_folder.glob('*.txt'):

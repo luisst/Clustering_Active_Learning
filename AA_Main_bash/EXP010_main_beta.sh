@@ -47,33 +47,31 @@ export min_overlap_percentage="0.3"
 
 export DT_THRESHOLD="0.8"
 
-echo -e "\t>>>>> STG-1 VAD, Chunks Divide, Silent Detection, Double-Talk Detection <<<<<"
+export STG1_MP4_FOLDER="${ROOT_PATH}/${DATASET_NAME}/input_mp4s"
 
 #### Stage 1 VAD
 export current_stg1="${ROOT_PATH}/${DATASET_NAME}/STG_1/STG1_${VAD_NAME}"
 export STG1_WAVS="${ROOT_PATH}/${DATASET_NAME}/input_wavs/"
 export STG1_FILTERED_CHUNKS_WAVS="${current_stg1}/wav_chunks_filtered"
 
-source ./BB_Stages_bash/STG1_SHAS.sh
+# source ./BB_Stages_bash/STG1_SHAS.sh
 
 #### Stage 2 Feature Extraction
 export current_stg2="${ROOT_PATH}/${DATASET_NAME}/STG_2/STG2_${EXP_NAME}-${VAD_NAME}-${FEAT_NAME}"
 
 export STG2_FEATS_PICKLE="${current_stg2}/${DATASET_NAME}_${VAD_NAME}_${FEAT_NAME}_feats.pickle"
 export STG2_FEATS_ENHANCED="${current_stg2}/${DATASET_NAME}_${VAD_NAME}_${FEAT_NAME}_featsEN.pickle"
-echo -e "STG2_FEATS_PICKLE: $STG2_FEATS_PICKLE"
-echo -e "STG2_FEATS_ENHANCED: $STG2_FEATS_ENHANCED"
 
 export ENHANCE_RUN_ID="skipped"
 
-if [ "$MOVE_ON" = "true" ]; then
-source ./BB_Stages_bash/STG2_DVECTORS_ENHANCER.sh
-fi
+# if [ "$MOVE_ON" = "true" ]; then
+# source ./BB_Stages_bash/STG2_DVECTORS_ENHANCER.sh
+# fi
 
 #### Stage 3 Unsupervised Method
 export current_stg3="${ROOT_PATH}/${DATASET_NAME}/STG_3/STG3_${EXP_NAME}-${VAD_NAME}-${FEAT_NAME}-${METHOD_NAME}"
 export STG3_MERGED_WAVS="${current_stg3}/merged_wavs"
-export STG3_FINAL_CSV="${current_stg3}/final_csv"
+export STG3_AL_INPUT="${current_stg3}/AL_input_merged.csv"
 
 export pca_elem="0"
 
@@ -83,25 +81,22 @@ export min_samples="5"
 
 export RUN_PARAMS="pca${pca_elem}_mcs${min_cluster_size}_ms${min_samples}_${hdb_mode}"
 
-# cd $SRC_PATH
-# if [ "$MOVE_ON" = "true" ]; then
-# source ./BB_Stages_bash/STG3_META_HDB.sh
-# fi
+cd $SRC_PATH
+if [ "$MOVE_ON" = "true" ]; then
+source ./BB_Stages_bash/STG3_META_HDB.sh
+fi
 
 
-# #### Stage 4 Metrics
-# export STG1_GT_CSV="${ROOT_PATH}/${DATASET_NAME}/GT_final/"
-# export STG4_METRICS="${current_stg3}/metrics"
-# export STG4_METRIC_RUNNAME="${DATASET_NAME}_${VAD_NAME}_${FEAT_NAME}_${METHOD_NAME}"
-
-# export pred_suffix_added="pred"
-# export pred_ext="csv"
+#### Stage 4 LP
+export LP_METHOD_NAME="LP1"
+export current_stg4="${ROOT_PATH}/${DATASET_NAME}/STG_4/STG4_${LP_METHOD_NAME}"
+export STG4_HUMAN="${current_stg4}/webapp_results"
 
 
-# cd $SRC_PATH
-# if [ "$MOVE_ON" = "true" ]; then
-#     source STG4_ENTROPY.sh
-# fi
+cd $SRC_PATH
+if [ "$MOVE_ON" = "true" ]; then
+    source ./BB_Stages_bash/STG4_LP.sh
+fi
 
 ## Add Azure comparison
 

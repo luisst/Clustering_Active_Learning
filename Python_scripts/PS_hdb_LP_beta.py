@@ -65,7 +65,7 @@ def mst_hdbscan_to_sparse_matrix(mst_object):
     
     return sparse_matrix
 
-def active_learning_sample_selection(hdb_labels, hdb_probs, X_data, umap_data, n_samples_per_cluster=3):
+def active_learning_sample_selection(hdb_labels, hdb_probs, X_data, umap_data, n_samples_per_cluster=3, plot_flag=False):
     """
     Select samples for manual labeling using Active Learning strategies.
     
@@ -194,6 +194,25 @@ def active_learning_sample_selection(hdb_labels, hdb_probs, X_data, umap_data, n
         
         print(f"  Cluster {cluster_id}: Selected {len(selected_for_cluster)} samples "
               f"from {len(cluster_indices)} total ({reasons_for_cluster})")
+    if plot_flag:
+        # Plot UMAP with selected samples highlighted
+        plt.figure(figsize=(10, 8))
+        plt.scatter(umap_data[:, 0], umap_data[:, 1], c='lightgray', s=20, label='All samples')
+        
+        colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta']
+        color_map = {cid: colors[i % len(colors)] for i, cid in enumerate(unique_clusters)}
+        
+        for cluster_id, sample_indices in selected_samples.items():
+            cluster_umap = umap_data[sample_indices]
+            plt.scatter(cluster_umap[:, 0], cluster_umap[:, 1], 
+                        c=color_map[cluster_id], s=25, label=f'Cluster {cluster_id}')
+        
+        plt.title('UMAP Projection with Selected Active Learning Samples')
+        plt.xlabel('UMAP 1')
+        plt.ylabel('UMAP 2')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
     
     return selected_samples, selection_reasons
 
@@ -259,7 +278,7 @@ if __name__ == "__main__":
     pickle_file = Path(r"C:\Users\luis2\Dropbox\DATASETS_AUDIO\Unsupervised_Pipeline\MiniClusters\STG_2\STG2_EXP010-SHAS-DV\MiniClusters_SHAS_DV_feats.pickle")
     run_id = "distx"
 
-    output_folder_path = pickle_file.parent / "hdb_lp2"  # Update with the actual path
+    output_folder_path = pickle_file.parent / "hdb_lp4"  # Update with the actual path
     log_path = output_folder_path / f"{run_id}_log.txt"
     output_folder_path.mkdir(parents=True, exist_ok=True)
 
@@ -320,7 +339,7 @@ if __name__ == "__main__":
 
     # Active Learning Sample Selection
     selected_samples, selection_reasons = active_learning_sample_selection(
-        hdb_labels, hdb_probs, X_data, umap_data, n_samples_per_cluster=3
+        hdb_labels, hdb_probs, X_data, umap_data, n_samples_per_cluster=3, plot_flag=True
     )
 
     # Format and save results for manual labeling

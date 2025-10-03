@@ -38,13 +38,15 @@ def valid_path(path):
     else:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
-feats_pickle_ex = Path('/home/luis/Dropbox/DATASETS_AUDIO/Unsupervised_Pipeline/TestAO-Irma/STG_2/STG2_EXP010-SHAS-DV2/TestAO-Irma_SHAS_DV2_featsEN-false.pickle')
+base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline','MiniClusters')
+feats_pickle_ex = base_path_ex.joinpath('STG_2','STG2_EXP010-SHAS-DV','MiniClusters_SHAS_DV_featsEN.pickle')
+
 output_folder_path_ex = Path('/home/luis/Dropbox/DATASETS_AUDIO/Unsupervised_Pipeline/dv2')
 run_params_ex = f"pca{pca_elem}_mcs{min_cluster_size}_ms{min_samples}_{hdb_mode}"
 Exp_name_ex = 'TestAO-IrmaR'
-
-pred_lbl_pickle_ex = output_folder_path_ex / 'predlbl.pickle'
-pred_reduced_feats_ex = output_folder_path_ex / 'reduced_feats.pickle'
+clusters_data_pickle_ex = output_folder_path_ex / 'clusters_data.pickle'
+reduced_features_pickle_ex = output_folder_path_ex / 'reduced_features.pickle'
+pred_label_pickle_ex = output_folder_path_ex / 'pred_label.pickle'
 
 
 parser = argparse.ArgumentParser()
@@ -53,15 +55,19 @@ parser.add_argument('--output_pred_folder', type=valid_path, default=output_fold
 parser.add_argument('--run_params', default=run_params_ex, help='string with the run params for HDBSCAN')
 parser.add_argument('--exp_name', default=Exp_name_ex, help='string with the experiment name')
 
-parser.add_argument('--pred_lbl_picke', default=pred_lbl_pickle_ex, help='Output path for clustering labels')
-parser.add_argument('--pred_reduced_feats', default=pred_reduced_feats_ex, help='Output path for reduced features')
+parser.add_argument('--data_clusters_pickle', default=clusters_data_pickle_ex, help='Output path for clustering labels')
+parser.add_argument('--stg3_reduced_features', default=reduced_features_pickle_ex, help='Output path for clustering labels')
+parser.add_argument('--stg3_pred_lbl', default=pred_label_pickle_ex, help='Output path for clustering labels')
+
+
 args = parser.parse_args()
 
 output_folder_path = Path(args.output_pred_folder)
 feats_pickle_path = Path(args.input_feats_pickle)
 
-pred_lbl_pickle = Path(args.pred_lbl_picke)
-pred_reduced_feats = Path(args.pred_reduced_feats)
+data_clusters_pickle = Path(args.data_clusters_pickle)
+reduced_features_pickle = Path(args.stg3_reduced_features)
+pred_label_pickle = Path(args.stg3_pred_lbl)
 
 run_params = args.run_params
 Exp_name = args.exp_name
@@ -92,12 +98,6 @@ with open(f'{feats_pickle_path}', "rb") as file:
 Mixed_X_data, Mixed_X_paths, Mixed_y_labels = X_data_and_labels
 
 current_run_id = f'{Exp_name}_{run_params}'
-
-hdb_data_input = None
-# if pca_elem == None or pca_elem == 0:
-#     hdb_data_input = Mixed_X_data
-# else:
-#     hdb_data_input = run_pca(Mixed_X_data, pca_elem) 
 
 n_components = 20
 data_standardized = StandardScaler().fit_transform(Mixed_X_data)
@@ -149,25 +149,17 @@ samples_label = hdb_selected.labels_
 df_mixed = gen_tsne(hdb_data_input, Mixed_y_labels)
 x_tsne_2d = np.array(list(zip(df_mixed['tsne-2d-one'], df_mixed['tsne-2d-two'])))
 
-with open(str(pred_reduced_feats), 'wb') as handle:
+# Join the data for next stage
+clusters_data = [Mixed_X_paths, hdb_data_input, x_tsne_2d, Mixed_y_labels, samples_label, samples_prob, samples_outliers]
+
+with open(data_clusters_pickle, 'wb') as handle:
+    pickle.dump(clusters_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+with open(reduced_features_pickle, 'wb') as handle:
     pickle.dump(hdb_data_input, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-with open(pred_lbl_pickle, 'wb') as handle:
+with open(pred_label_pickle, 'wb') as handle:
     pickle.dump(samples_label, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-# Store x_tsne_2d for later use
-with open(f'{output_folder_path}/{current_run_id}_xtsne2d.pickle', 'wb') as handle:
-    pickle.dump(x_tsne_2d, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-# Store Mixed_X_paths and Mixed_y_labels on a similar way
-with open(f'{output_folder_path}/{current_run_id}_Xpaths.pickle', 'wb') as handle:
-    pickle.dump(Mixed_X_paths, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-info_pred = [samples_label, x_tsne_2d, Mixed_X_paths]
-# Store Mixed_X_paths and Mixed_y_labels on a similar way
-with open(f'{output_folder_path}/{current_run_id}_predinfo.pickle', 'wb') as handle:
-    pickle.dump(info_pred, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
 
 plot_clustering_dual(x_tsne_2d, Mixed_y_labels,
                         samples_label, samples_prob,
@@ -188,4 +180,4 @@ plt.grid()
 plt.savefig(f"{output_folder_path}/{current_run_id}_umap_2d.png")
 plt.close()
 
-# organize_samples_by_label(Mixed_X_paths, samples_label, samples_prob, output_folder_path)
+organize_samples_by_label(Mixed_X_paths, samples_label, samples_prob, output_folder_path)

@@ -329,10 +329,10 @@
     <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/timeline.min.js"></script>
     <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
     <script>
-        function getParameterByName(name) {
+        function getParameterByName(name, method_name) {
             const url = new URL(window.location.href);
             const params = new URLSearchParams(url.search);
-            return params.get(name);
+            return [params.get(name), params.get(method_name)];
         }
 
         // Loop a region on click
@@ -341,10 +341,13 @@
         var ws = null;
         var videoName = '';
         var current_src_url = '';
+        var current_method_name = 'LPX';
 
         document.addEventListener('DOMContentLoaded', function () {
 
-        const current_srcName_url = getParameterByName('media');
+        const params_tuple = getParameterByName('media', 'method');
+        const current_srcName_url = params_tuple[0];
+        current_method_name = params_tuple[1];
 
         // Extract media extension
         var current_src_ext = current_srcName_url.split('.').pop();
@@ -448,7 +451,8 @@
         findAndLoadImage(videoName);
 
         // The URL path to the CSV file
-        const csvFilePath = `STG_4/AL_input/${videoName}_ALinput.csv`;
+        const csvFilePath = `STG_4/STG4_${current_method_name}/${videoName}_ALinput.csv`;
+        console.log(csvFilePath);
 
         loadCSV(csvFilePath);
 
@@ -1088,6 +1092,19 @@
             var mydate = today.toISOString();
             hiddenElement.download = String(current_video_name) + '-' + mydate + '.csv';  
             hiddenElement.click();
+
+            // Export inputData as well
+            var csv_input = 'SampleIndex\tClusterPred\tStartTime\tEndTime\tSpeakerLP\n';
+            inputData.forEach(function(row) {  
+                    csv_input += row.join('\t');  
+                    csv_input += "\n";  
+            });
+            var hiddenElement_input = document.createElement('a');
+            hiddenElement_input.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv_input);  
+            hiddenElement_input.target = '_blank';
+            hiddenElement_input.download = String(current_video_name) + '-ALinput-' + mydate + '.csv';  
+            hiddenElement_input.click();
+
         } 
     </script>
 </body>

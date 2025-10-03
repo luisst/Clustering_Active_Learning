@@ -47,13 +47,13 @@ export VAD_ROOT="${VAD_LOCATION}/repo"
 export path_to_yaml_file="${path_to_yaml_folder}/VAD_${EXP_NAME}.yaml"
 
 
-echo -e "\n\t>>>>> Stage1vad: $STG1_WAVS\n"
-if [ "$SKIP_VAD" != "true" ]; then
-    python3 ${VAD_ROOT}/src/supervised_hybrid/segment.py -wavs $STG1_WAVS -ckpt $STG1_VAD_PRETRAINED -yaml $path_to_yaml_file -max 10
-    echo -e "\t>>>>> VAD output: $path_to_yaml_file"
-else
-    echo -e "\n\t>>>>> Stage1: VAD skipped\n"
-fi
+# echo -e "\n\t>>>>> Stage1vad: $STG1_WAVS\n"
+# if [ "$SKIP_VAD" != "true" ]; then
+#     python3 ${VAD_ROOT}/src/supervised_hybrid/segment.py -wavs $STG1_WAVS -ckpt $STG1_VAD_PRETRAINED -yaml $path_to_yaml_file -max 10
+#     echo -e "\t>>>>> VAD output: $path_to_yaml_file"
+# else
+#     echo -e "\n\t>>>>> Stage1: VAD skipped\n"
+# fi
 
 echo -e "\n\t>>>>> Stage1a: $path_to_yaml_file\n"
 cd $SRC_PATH

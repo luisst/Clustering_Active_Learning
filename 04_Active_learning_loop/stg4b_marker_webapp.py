@@ -7,11 +7,18 @@ import urllib.parse
 import os
 import shutil
 import socket
+import argparse
 
 # ---------- CONFIG ----------
 PORT = 8000
 
 # ----------------------------
+def valid_path(path):
+    if os.path.exists(path):
+        return Path(path)
+    else:
+        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
+
 def get_free_port(default=8000):
     try:
         with socketserver.TCPServer(("localhost", default), None) as s:
@@ -48,13 +55,22 @@ if __name__ == "__main__":
     base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline','MiniClusters')
     stg1_mp4_candidate_ex = base_path_ex.joinpath('input_mp4s')
     stg4_al_input_ex = base_path_ex.joinpath('STG_4','AL_input')
-    remote_server_root = stg4_al_input_ex.parent
 
-    # For loop read csv files in stg4_al_input_ex
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--stg1_mp4_candidate', default=stg1_mp4_candidate_ex, help='Stg1 MP4 candidate folder path')
+    parser.add_argument('--stg4_al_folder', type=valid_path, default=stg4_al_input_ex, help='Stg4 AL input folder path')
+
+    args = parser.parse_args()
+    stg1_mp4_candidate = Path(args.stg1_mp4_candidate)
+    stg4_al_folder = Path(args.stg4_al_folder)
+
+    remote_server_root = stg4_al_folder.parent
+
+    # For loop read csv files in stg4_al_folder
     # Each csv file has columns: cluster_id, start_time, end_time
 
     # List all csv files in the directory
-    csv_files = list(stg4_al_input_ex.glob("*.csv"))
+    csv_files = list(stg4_al_folder.glob("*.csv"))
 
     for i, current_csv_file in enumerate(csv_files):
         # current_csv_file = csv_files[0]  # For testing, just take the first file
@@ -63,12 +79,12 @@ if __name__ == "__main__":
         mp4_flag = False
 
         # Verify if mp4 candidate folder exists and has *.mp4 files
-        if stg1_mp4_candidate_ex.exists() and any(stg1_mp4_candidate_ex.glob("*.mp4")):
-            print(f"MP4 candidate folder is ready: {stg1_mp4_candidate_ex}")
+        if stg1_mp4_candidate.exists() and any(stg1_mp4_candidate.glob("*.mp4")):
+            print(f"MP4 candidate folder is ready: {stg1_mp4_candidate}")
             mp4_flag = True
         else:
-            print(f"Warning: {stg1_mp4_candidate_ex} does not exist or has no mp4 files.")
-        
+            print(f"Warning: {stg1_mp4_candidate} does not exist or has no mp4 files.")
+
         if mp4_flag:
 
             # Delete _ALinput suffix if exists
@@ -77,7 +93,7 @@ if __name__ == "__main__":
 
             print(f"Processing {current_csv_file}: long_video = {long_video}")
 
-            current_media_path = stg1_mp4_candidate_ex.joinpath(f"{long_video}.wav")
+            current_media_path = stg1_mp4_candidate.joinpath(f"{long_video}.wav")
 
             # Verify if long wav exists
             if not current_media_path.exists():

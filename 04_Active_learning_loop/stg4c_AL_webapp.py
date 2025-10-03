@@ -46,20 +46,23 @@ if __name__ == "__main__":
 
     html_AL = "AL2_LP_webapp.html"
 
-    base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline','MiniClusters')
+    LP_METHOD_NAME = "LP1"
+    DATASET_NAME = "TTS4_easy"
+
+    base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline',DATASET_NAME)
     stg1_mp4_candidate_ex = base_path_ex.joinpath('input_mp4s')
     stg1_wav_candidate_ex = base_path_ex.joinpath('input_wavs')
-    stg4_al_input_ex = base_path_ex.joinpath('STG_4','AL_input')
+    stg4_al_folder_ex = base_path_ex.joinpath('STG_4',f'STG4_{LP_METHOD_NAME}')
     remote_server_root = base_path_ex
 
-    # For loop read csv files in stg4_al_input_ex
+    # For loop read csv files in stg4_al_folder_ex
     # Each csv file has columns: cluster_id, start_time, end_time
 
     # List all csv files in the directory
-    csv_files = list(stg4_al_input_ex.glob("*.csv"))
+    csv_files = list(stg4_al_folder_ex.glob("*.csv"))
 
     # for i, current_csv_file in enumerate(csv_files):
-    i = 4
+    i = 0
     current_csv_file = csv_files[i]  # For testing, just take the first file
     long_media = current_csv_file.stem
 
@@ -123,7 +126,7 @@ if __name__ == "__main__":
 
     # Build URL
     media_url = urllib.parse.quote(current_media_path.name)
-    url = f"http://localhost:{port}/{html_path.name}?media={media_url}"
+    url = f"http://localhost:{port}/{html_path.name}?media={media_url}&method={LP_METHOD_NAME}"
 
     # Open browser
     print(f"[INFO] Opening browser at: {url}")
