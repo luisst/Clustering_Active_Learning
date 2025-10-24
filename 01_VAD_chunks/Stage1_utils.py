@@ -12,7 +12,7 @@ def vad_format(current_transcript_pth):
 
     reference = Annotation()
     for line in lines:
-        Speaker, Lang, start_time, stop_time = line.split('\t')
+        Speaker, Lang, start_time, stop_time, gt_filename, gt_rnd_idx = line.split('\t')
         reference[Segment(float(start_time), float(stop_time))] = 'speech'
 
     return reference

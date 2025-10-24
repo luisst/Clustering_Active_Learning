@@ -329,6 +329,10 @@
     <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/timeline.min.js"></script>
     <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
     <script>
+
+
+
+
         function getParameterByName(name, method_name) {
             const url = new URL(window.location.href);
             const params = new URLSearchParams(url.search);
@@ -366,6 +370,8 @@
         // const videoUrl = urlParams.get('video')
         // console.log("Video URL:", videoUrl)
 
+        console.log(">>>>>>>>>>>>>>>>>>>>>>>>>> mini test <<<<<<<<<<<<<<<<<<<<<<")
+
         document.getElementById('video').src = current_src_url;
 
         console.log(current_src_url);
@@ -393,11 +399,6 @@
             minPxPerSec: 100,
             plugins: [WaveSurfer.Timeline.create()],
         });
-
-        // Play on click
-        ws.once('interaction', () => {
-            ws.play()
-        })
 
         // Initialize the Regions plugin
         wsRegions = ws.registerPlugin(WaveSurfer.Regions.create())
@@ -432,11 +433,31 @@
             region.play()
             region.setOptions({ color: randomColor() })
             })
-            // Reset the active region when the user clicks anywhere in the waveform
-            ws.on('interaction', () => {
+            // Allow clicking on waveform to seek
+            ws.on('interaction', (time) => {
             activeRegion = null
+            // The seek is handled automatically by WaveSurfer
             })
         }
+
+        // Handle seeking - ensure video stays in sync
+        ws.on('seeking', (currentTime) => {
+            console.log('Seeking to:', currentTime)
+        })
+
+        ws.on('timeupdate', (currentTime) => {
+            // Sync is automatic via media element
+        })
+
+        // Ensure media is ready before allowing interaction
+        ws.on('ready', () => {
+            console.log('WaveSurfer is ready, duration:', ws.getDuration())
+        })
+
+        // Add error handler to catch any media issues
+        ws.media.addEventListener('error', (e) => {
+            console.error('Media error:', e)
+        })
 
 
         // Update the zoom level on slider change
@@ -459,7 +480,6 @@
         started_flag = true;
 
         });
-
 
         // Function to automatically look for a PNG image with the name equal to group_code
         function findAndLoadImage(full_video_name) {
@@ -639,16 +659,18 @@
         if (inputData.length > 0 && inputData_index < inputData.length) {
             // Remove the last region if it exists
             if (currentRegion) {
-            currentRegion.remove();
+                currentRegion.remove();
             }
 
             if (inputData[inputData_index][4] != 99) {
-            assumption_flag = true;
+                assumption_flag = true;
             } else {
-            assumption_flag = false;
+                assumption_flag = false;
             }
 
             console.log("index: " + inputData_index + " Assumption flag: " + assumption_flag);
+            console.log(">>>>>>>>>>>>>>>>>>>>>>>>>> nxt seg <<<<<<<<<<<<<<<<<<<<<<")
+
 
             draw_prev_after_segment(inputData_index);
 
@@ -664,13 +686,13 @@
 
             // Use them as start and end time with the wsRegions.addRegion
             currentRegion = wsRegions.addRegion({
-            start: current_start_time,
-            end: current_end_time,
-            color: assumption_flag ? return_speaker_color(inputData_index -1) : `rgba(93,109,126, 0.5)`, 
-            drag: true,
-            resize: true,
-            minLength: 0.5,
-            maxLength: 20,
+                start: current_start_time,
+                end: current_end_time,
+                color: assumption_flag ? return_speaker_color(inputData_index -1) : `rgba(93,109,126, 0.5)`, 
+                drag: true,
+                resize: true,
+                minLength: 0.5,
+                maxLength: 20,
             });
 
             // Calculate the duration of the segment
@@ -688,7 +710,13 @@
             // Scroll to the calculated position
             ws.renderer.scrollContainer.scrollLeft = scrollPosition;
 
-            ws.media.currentTime = current_start_time;
+            console.log("\tCluster: " + current_src + " Start: " + current_start_time + " End: " + current_end_time);
+            console.log("Current time before set7: " + ws.media.currentTime);
+
+            // Use WaveSurfer's setTime method instead of directly setting media.currentTime
+            ws.setTime(current_start_time);
+
+            console.log("Current time after set7: " + ws.getCurrentTime());
 
 
             // Write the current cluster number to the page 
@@ -804,6 +832,7 @@
         document.addEventListener('keydown', (event) => {
         var code = event.code;
         if (code == 'KeyV')
+            console.log("Key V - Current time: " + ws.getCurrentTime());
             if (ws.isPlaying()) {
             ws.pause();
             } else {
@@ -1058,13 +1087,24 @@
 
         function aroundPlaySegment(){
 
-        // Disable loop
-        loop = false;
-        document.getElementById('loopBox').checked = false;
+            // Disable loop
+            loop = false;
+            document.getElementById('loopBox').checked = false;
 
-        new_segment_start = currentRegion.start - 2;
-        ws.setTime(new_segment_start);
-        ws.play();
+            new_segment_start = currentRegion.start - 2;
+            console.log("Around play from: " + new_segment_start);
+
+            // Set the time and wait for the seek to complete before playing
+            ws.setTime(new_segment_start);
+
+            // Wait for the 'seeked' event on the media element before playing
+            ws.media.addEventListener('seeked', function onSeeked() {
+                console.log("AfterAround8 - Current time ws: " + ws.getCurrentTime());
+                console.log("AfterAround8 - The other time: " + ws.media.currentTime);
+                ws.play();
+                // Remove the event listener after it fires once
+                ws.media.removeEventListener('seeked', onSeeked);
+            }, { once: true });
         }
 
 
@@ -1106,6 +1146,7 @@
             hiddenElement_input.click();
 
         } 
+
     </script>
 </body>
 </html>

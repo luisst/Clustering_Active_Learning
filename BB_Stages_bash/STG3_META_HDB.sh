@@ -41,45 +41,46 @@ python3 ${SRC_PATH}/folder_verify.py $STG3_FINAL_CSV
 if [ $? -eq 1 ]; then
     export SKIP_STG3e=true
 fi
+
 python3 ${SRC_PATH}/folder_verify.py $STG3_SEPARATED_MERGED_WAVS
 
 conda activate metaSR2
 
-# ## Run the HDBSCAN prediction
-# echo -e "\n\t>>>>> Stg3A HDB-SCAN pred: $STG3_HDBSCAN_PRED_OUTPUT\n"
-# if [ "$SKIP_STG3A" != "true" ]; then
-#     python3 ${SRC_PATH}/03_Clustering_TDA/Stg3A_main_hdbscan_pred_output.py --input_feats_pickle $STG2_FEATS_ENHANCED\
-#     --output_pred_folder $STG3_HDBSCAN_PRED_OUTPUT\
-#     --run_params $RUN_PARAMS --exp_name $RUN_ID\
-#     --data_clusters_pickle $STG3_CLUSTERING_PICKLE --stg3_reduced_features $STG3_REDUCED_FEATURES\
-#     --stg3_pred_lbl $STG3_CLUSTERING_LBLS
+## Run the HDBSCAN prediction
+echo -e "\n\t>>>>> Stg3A HDB-SCAN pred: $STG3_HDBSCAN_PRED_OUTPUT\n"
+if [ "$SKIP_STG3A" != "true" ]; then
+    python3 ${SRC_PATH}/03_Clustering_TDA/Stg3A_main_hdbscan_pred_output.py --input_feats_pickle $STG2_FEATS_ENHANCED\
+    --output_pred_folder $STG3_HDBSCAN_PRED_OUTPUT\
+    --run_params $RUN_PARAMS --exp_name $RUN_ID\
+    --data_clusters_pickle $STG3_CLUSTERING_PICKLE --stg3_reduced_features $STG3_REDUCED_FEATURES\
+    --stg3_pred_lbl $STG3_CLUSTERING_LBLS
 
-#     # Check if the Python script was successful
-#     if [ $? -ne 0 ]; then
-#         export MOVE_ON=false
-#         echo "Move on: $MOVE_ON"
-#         return 1
-#     fi
-# else
-#     echo -e "\n\t>>>>> Stage 3a: HDBSCAN prediction skipped\n"
-# fi
+    # Check if the Python script was successful
+    if [ $? -ne 0 ]; then
+        export MOVE_ON=false
+        echo "Move on: $MOVE_ON"
+        return 1
+    fi
+else
+    echo -e "\n\t>>>>> Stage 3a: HDBSCAN prediction skipped\n"
+fi
 
-# ## Print Clustering metrics
-# echo -e "\n\t>>>>> Stg3c Clustering metrics $STG3_CLUSTERING_METRICS\n"
-# if [ "$SKIP_metrics" != "true" ]; then
-#     python3 ${SRC_PATH}/03_Clustering_TDA/Stg3c_internal_clusters.py --input_feats_pickle $STG2_FEATS_ENHANCED\
-#         --input_feats_reduced_pickle $STG3_REDUCED_FEATURES\
-#     --stg3_pred_lbl $STG3_CLUSTERING_LBLS --stg3_clustering_metrics $STG3_CLUSTERING_METRICS 
+## Print Clustering metrics
+echo -e "\n\t>>>>> Stg3c Clustering metrics $STG3_CLUSTERING_METRICS\n"
+if [ "$SKIP_metrics" != "true" ]; then
+    python3 ${SRC_PATH}/03_Clustering_TDA/Stg3c_internal_clusters.py --input_feats_pickle $STG2_FEATS_ENHANCED\
+        --input_feats_reduced_pickle $STG3_REDUCED_FEATURES\
+    --stg3_pred_lbl $STG3_CLUSTERING_LBLS --stg3_clustering_metrics $STG3_CLUSTERING_METRICS 
 
-#     # Check if the Python script was successful
-#     if [ $? -ne 0 ]; then
-#         export MOVE_ON=false
-#         echo "Move on: $MOVE_ON"
-#         return 1
-#     fi
-# else
-#     echo -e "\n\t>>>>> Stage 3c: Clustering metrics skipped\n"
-# fi
+    # Check if the Python script was successful
+    if [ $? -ne 0 ]; then
+        export MOVE_ON=false
+        echo "Move on: $MOVE_ON"
+        return 1
+    fi
+else
+    echo -e "\n\t>>>>> Stage 3c: Clustering metrics skipped\n"
+fi
 
 
 ## Join the predictions chunks into a merged wav files
@@ -105,19 +106,19 @@ fi
 
 
 
-# ## Create the final csv file
-# echo -e "\n\t>>>>> Stage 3e: Output Final CSV prediction $STG3_FINAL_CSV\n"
-# if [ "$SKIP_STG3e" != "true" ]; then
-#     python3 ${SRC_PATH}/03_Clustering_TDA/Stg3e_create_csv_from_merged.py --stg3_merged_wavs $STG3_MERGED_WAVS\
-#     --stg3_final_csv $STG3_FINAL_CSV --stg3_separated_merged_wavs $STG3_SEPARATED_MERGED_WAVS
+## Create the final csv file
+echo -e "\n\t>>>>> Stage 3e: Output Final CSV prediction $STG3_FINAL_CSV\n"
+if [ "$SKIP_STG3e" != "true" ]; then
+    python3 ${SRC_PATH}/03_Clustering_TDA/Stg3e_create_csv_from_merged.py --stg3_merged_wavs $STG3_MERGED_WAVS\
+    --stg3_final_csv $STG3_FINAL_CSV --stg3_separated_merged_wavs $STG3_SEPARATED_MERGED_WAVS
 
-#     # Check if the Python script was successful
-#     if [ $? -ne 0 ]; then
-#         export MOVE_ON=false
-#         echo "Move on: $MOVE_ON"
-#         return 1
-#     fi
-# else
-#     echo -e "\n\t>>>>> Stage 3e: Final CSV prediction skipped\n"
-# fi
+    # Check if the Python script was successful
+    if [ $? -ne 0 ]; then
+        export MOVE_ON=false
+        echo "Move on: $MOVE_ON"
+        return 1
+    fi
+else
+    echo -e "\n\t>>>>> Stage 3e: Final CSV prediction skipped\n"
+fi
 

@@ -1,5 +1,6 @@
 from pathlib import Path
 import pickle
+import json
 import os
 import argparse
 import shutil
@@ -45,7 +46,7 @@ parser.add_argument('--st', type=float, default=step_size_ex, help='Stg2 chunks 
 parser.add_argument('--gap', type=float, default=gap_size_ex, help='Stg2 chunks gap in seconds')
 parser.add_argument('--consc_th', type=int, default=consc_th_ex, help='Stg3 consecutive chunks threshold')
 parser.add_argument('--exp_name', default=Exp_name_ex, help='string with the experiment name')
-parser.add_argument('--AL_input_csv', default=al_input_csv_ex, help='Path to the folder to store the D-vectors features')
+parser.add_argument('--AL_input_csv', default=al_input_csv_ex, help='Path to the folder to store predictions for Active Learning')
 args = parser.parse_args()
 
 stg3_pred_folders = args.stg3_pred_folders 
@@ -60,7 +61,7 @@ minimum_chunk_duration = chunk_duration - 0.1 # seconds
 step_length = float(args.st) 
 gap_duration = float(args.gap) 
 consecutive_threshold = int(args.consc_th)
-al_input_csv = args.AL_input_csv
+al_input_csv = Path(args.AL_input_csv)
 
 exp_name = args.exp_name
 
@@ -79,6 +80,8 @@ Mixed_X_paths, hdb_data_input, x_tsne_2d, Mixed_y_labels, samples_label, samples
 with open(f'{feats_pickle_path}', "rb") as file:
     x_data, x_paths, _ = pickle.load(file)
 
+output_folder_al = al_input_csv.parent
+
 # Convert Mixed_X_paths wav names to a dictionary for faster lookup
 path_to_index = {Path(path).stem: idx for idx, path in enumerate(Mixed_X_paths)}
 
@@ -96,6 +99,8 @@ merged_y_labels = []
 merged_sample_labels = []
 merged_sample_probs = []
 merged_sample_outliers = []
+merged_files_mapping = {}
+merged_idx = 0
 
 counts_segments = []
 verbose = True
@@ -134,7 +139,7 @@ for current_pred_label_path in label_subfolders:
 
     ############################### 2) Create DICT successive files (per long audio) 
     for sub_folder in base_names_list:
-        print(f'\n{current_predicted_label}\tInside subfolder - {sub_folder}')
+        # print(f'\n{current_predicted_label}\tInside subfolder - {sub_folder}')
         current_sub_directory = output_separated_wavs.joinpath(current_predicted_label, sub_folder)
 
         # List all .wav files in the sub-directory
@@ -162,7 +167,7 @@ for current_pred_label_path in label_subfolders:
 
         merged_segments = []
         if not time_file_tuples:
-            print(f'No wav files found in {current_sub_directory}, skipping...')
+            print(f'\t!!No wav files found in {current_sub_directory}, skipping...')
             continue
 
         # # For debugging: print the time_file_tuples
@@ -206,7 +211,7 @@ for current_pred_label_path in label_subfolders:
         for idx_seg, current_merged_data in enumerate(merged_segments):
             start_time, stop_time, constituent_files = current_merged_data
 
-            print(f'\tConstitutent files in segment {idx_seg}: {len(constituent_files)}')
+            # print(f'\tConstitutent files in segment {idx_seg}: {len(constituent_files)}')
             
             if counts_segments[len(counts_segments) - len(merged_segments) + idx_seg] < consecutive_threshold:
                 continue
@@ -229,7 +234,11 @@ for current_pred_label_path in label_subfolders:
                                start_time_csv=str(start_time),
                                stop_time_csv=str(stop_time))
 
-            print(f'\t\tCreated merged wav: {output_filename}')
+            # print(f'\t\tCreated merged wav: {output_filename}')
+
+            # Store the mapping of merged file to constituent files
+            constituent_filenames = [const_file.name for const_file in constituent_files]
+
 
             # Compute averaged metadata for this merged sample
             constituent_indices = []
@@ -247,7 +256,7 @@ for current_pred_label_path in label_subfolders:
             for const_file in constituent_files:
                 file_path_str = (const_file.stem).split('_')[:-1]  # Remove the last part (probability)
                 file_path_str = '_'.join(file_path_str)  # Join back to form the
-                print(f'Looking for {file_path_str} in dict')
+                # print(f'Looking for {file_path_str} in dict')
                 if file_path_str in path_to_index:
                     # print(f'>>>>>> Found file path in clustering data.')
                     idx = path_to_index[file_path_str]
@@ -263,9 +272,13 @@ for current_pred_label_path in label_subfolders:
 
 
                     tmp_umap_data = np.array(constituent_metadata['hdb_data'])
-                    print(f'hdb data shape: {tmp_umap_data.shape}')
+                    # print(f'hdb data shape: {tmp_umap_data.shape}')
+                else:
+                    print(f'>>>>>> Warning: File path {file_path_str} not found in clustering data.')
             
-            print(f'Found {len(constituent_indices)} constituent files in clustering data.')
+            # print(f'Found {len(constituent_indices)} constituent files in clustering data.')
+
+            most_frequent_y_label = 9999  # Default value in case no labels found
 
             if constituent_indices:
 
@@ -299,14 +312,21 @@ for current_pred_label_path in label_subfolders:
 
                 # For debugging print all merged sample data
                 if verbose:
-                    print(f'  > Merged sample data:')
-                    print(f'    - Path: {str(current_merged_wav_path)}')
-                    print(f'    - Number of constituent files: {len(constituent_files)}')
-                    print(f'    - HDB Data shape: {avg_hdb_data.shape}')
-                    print(f'    - Ground Truth Label: {most_frequent_y_label}')
-                    print(f'    - Sample Label: {merged_sample_label}')
-                    print(f'    - Sample Prob: {avg_sample_prob:.3f}')
-                    print(f'    - Sample Outlier: {avg_sample_outlier}')
+                    print(f'    - merged: {current_merged_wav_path.stem} \t n_files: {len(constituent_files)}')
+
+            merged_files_mapping[output_filename] = {
+                'merged_idx': merged_idx ,
+                'merged_file_path': str(current_merged_wav_path),
+                'original_long_wav': current_original_wav_filename,
+                'start_time': float(start_time),
+                'stop_time': float(stop_time),
+                'prob': round(float(avg_sample_prob), 3) if constituent_indices else None,
+                'predicted_label': int(current_predicted_label),
+                'avg_GT_label': int(most_frequent_y_label),
+                'num_constituent_files': len(constituent_files),
+                'constituent_files': constituent_filenames
+            }
+            merged_idx += 1
 
 
 print(f'\n\n*** Summary ***')
@@ -350,11 +370,18 @@ with open(str(counts_pickle_path), 'wb') as file:
     pickle.dump(counts_segments, file)
 
 print(f'Saved segment counts to: {counts_pickle_path}')
+# Save the merged files mapping to JSON
+merged_mapping_json_path = output_merged_audio.parent / 'merged_files_mapping.json'
+with open(str(merged_mapping_json_path), 'w', encoding='utf-8') as json_file:
+    json.dump(merged_files_mapping, json_file, indent=2, ensure_ascii=False)
+
+print(f'Saved merged files mapping to: {merged_mapping_json_path}')
+print(f'Total mappings saved: {len(merged_files_mapping)}')
 print('Merging process completed successfully!')
 
 # Active Learning Sample Selection
 selected_samples, selection_reasons = active_learning_sample_selection(
-    merged_sample_labels, merged_sample_probs, merged_hdb_data, n_samples_per_cluster=3, plot_flag=True
+    merged_sample_labels, merged_sample_probs, merged_hdb_data, output_folder_al, n_samples_per_cluster=3, plot_flag=True
 )
 
 # Format and save results for manual labeling

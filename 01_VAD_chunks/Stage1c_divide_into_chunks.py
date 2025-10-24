@@ -108,10 +108,10 @@ for csv_file in csv_folder.glob('*.txt'):
             # If GT folder path is provided, check if the current chunk overlaps with any GT segment
             if GT_flag:
                 GT_wav_file_path = GT_folder_path.joinpath(f'{csv_filename}_GT.csv')
-                # Read GT from tab-separated csv file with colums: speaker_id, lang, start_time, stop_time
+                # Read GT from tab-separated csv file with columns: speaker_id, lang, start_time, stop_time, filename, rnd_idx
                 GT_segments = []
                 for gt_line in GT_wav_file_path.open():
-                    gt_speaker, gt_lang, gt_start, gt_stop = gt_line.split('\t')
+                    gt_speaker, gt_lang, gt_start, gt_stop, gt_filename, gt_rnd_idx = gt_line.split('\t')
                     GT_segments.append((gt_speaker, float(gt_start), float(gt_stop)))
             
                 # Check for overlap

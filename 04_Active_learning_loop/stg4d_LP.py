@@ -6,6 +6,7 @@ import hdbscan as hdb
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+import pprint
 import mplcursors
 
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score, accuracy_score, classification_report, confusion_matrix
@@ -23,6 +24,46 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 from sklearn.exceptions import UndefinedMetricWarning
 from scipy.stats import entropy
 from scipy import sparse
+import csv
+
+def read_speaker_diarization(csv_file_path):
+    """
+    Reads a speaker diarization CSV file and returns a dictionary
+    mapping SampleIndex to SpeakerLP.
+    
+    Args:
+        csv_file_path (str): Path to the CSV file
+        
+    Returns:
+        dict: Dictionary with SampleIndex as keys and SpeakerLP as values
+        
+    Example:
+        >>> speaker_dict = read_speaker_diarization('diarization_output.csv')
+        >>> print(speaker_dict)
+        {101: 'S0', 7: 'S1', 81: 'S2', ...}
+    """
+    speaker_dict = {}
+    
+    try:
+        with open(csv_file_path, 'r', encoding='utf-8') as file:
+            csv_reader = csv.DictReader(file, delimiter='\t')
+            
+            for row in csv_reader:
+                sample_index = int(row['SampleIndex'])
+                speaker_lp = row['SpeakerLP']
+                speaker_dict[sample_index] = speaker_lp
+                
+    except FileNotFoundError:
+        print(f"Error: File '{csv_file_path}' not found.")
+        return {}
+    except KeyError as e:
+        print(f"Error: Missing expected column {e}")
+        return {}
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+        return {}
+    
+    return speaker_dict
 
 def calculate_mst_from_features(X_data, metric='euclidean', return_format='coo'):
     """
@@ -99,10 +140,20 @@ def calculate_mst_from_features(X_data, metric='euclidean', return_format='coo')
         raise ValueError("return_format must be 'coo' or 'edges'")
 
 
-base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline','MiniClusters')
+base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline','TTS4_easy')
 stg3_pred_folders_ex = base_path_ex.joinpath('STG_3','STG3_EXP010-SHAS-DV-hdb','merged_wavs')
+stg4_al_folder_ex = base_path_ex.joinpath('STG_4','STG4_LP1','webapp_results')
 
 merged_data_clusters_pickle = stg3_pred_folders_ex.parent / 'merged_clustering_data.pickle'
+
+webapp_csv_output_path = stg4_al_folder_ex / 'tts4_easy_labels.csv'
+
+output_folder_path = stg4_al_folder_ex.parent / 'lp_results'
+output_folder_path.mkdir(parents=True, exist_ok=True)
+
+log_path = output_folder_path / 'lp_log.txt'
+
+run_id = 'RUN001'
 
 with open(f'{merged_data_clusters_pickle}', "rb") as file:
     merged_clustering_data = pickle.load(file)
@@ -126,8 +177,9 @@ max_iter=100
 
 tol=1e-6
 # TODO: load human_labels from AL webapp
-human_labels = {0: 'Ari', 40: 'Ed', 75: 'Eve', 120: 'Jad', 170: 'Lan',
-                25: 'Ari', 55: 'Ed', 96: 'Eve', 140: 'Jad'}  # Example: index to speaker ID
+human_labels = read_speaker_diarization(webapp_csv_output_path)
+# human_labels = {0: 'Ari', 40: 'Ed', 75: 'Eve', 120: 'Jad', 170: 'Lan',
+#                 25: 'Ari', 55: 'Ed', 96: 'Eve', 140: 'Jad'}  # Example: index to speaker ID
 
 # X: (N, D) numpy array
 nbrs = NearestNeighbors(n_neighbors=k+1, metric=metric, n_jobs=-1).fit(merged_X_data)
@@ -220,7 +272,7 @@ n_classes = len(speaker_ids)
 # Create cluster-to-speaker mapping from manual labels
 cluster_to_speaker = {}
 for idx, spk in human_labels.items():
-    hdb_cluster = hdb_labels[idx]
+    hdb_cluster = merged_sample_labels[idx]
     if hdb_cluster != -1:  # Not noise
         if hdb_cluster in cluster_to_speaker:
             # If cluster already mapped, verify consistency
@@ -246,8 +298,8 @@ for i in range(n_samples):
     if i in human_labels:
         continue
     
-    hdb_cluster = hdb_labels[i]
-    hdb_confidence = hdb_probs[i]
+    hdb_cluster = merged_sample_labels[i]
+    hdb_confidence = merged_sample_probs[i]
     
     # Only add weak prior if:
     # 1. Not noise (-1)
@@ -273,7 +325,7 @@ for i in range(n_samples):
 
 print(f"Label propagation setup:")
 print(f"  Number of manually labeled samples: {len(human_labels)}")
-print(f"  Number of HDBSCAN weak priors: {np.sum((hdb_labels != -1) & (hdb_probs >= min_confidence_threshold) & (~np.isin(np.arange(n_samples), list(human_labels.keys()))))}")
+print(f"  Number of HDBSCAN weak priors: {np.sum((merged_sample_labels != -1) & (merged_sample_probs >= min_confidence_threshold) & (~np.isin(np.arange(n_samples), list(human_labels.keys()))))}")
 print(f"  Number of speaker classes: {n_classes}")
 print(f"  Speaker IDs: {speaker_ids}")
 print(f"  Weak prior strength: {weak_prior_strength}")
@@ -300,8 +352,8 @@ for it in range(max_iter):
         if i in human_labels:
             continue
             
-        hdb_cluster = hdb_labels[i]
-        hdb_confidence = hdb_probs[i]
+        hdb_cluster = merged_sample_labels[i]
+        hdb_confidence = merged_sample_probs[i]
         
         if (hdb_cluster != -1 and 
             hdb_cluster in cluster_to_speaker and 
@@ -343,13 +395,35 @@ print(f"  Min confidence: {np.min(confidence_scores):.4f}")
 print(f"  Max confidence: {np.max(confidence_scores):.4f}")
 
 # Use the human labels to map the y_labels numbers to speaker IDs
+print(f'shape of human_labels: {len(human_labels)} \t type: {type(human_labels)}')
 y_labels_dict = {} 
-for sample_idx, lbl in enumerate(y_labels):
+for sample_idx, lbl in enumerate(merged_y_labels):
+    print(f"Sample idx: {sample_idx}, Label: {lbl}")
     if sample_idx in human_labels:
+        print(f"   Mapped to speaker ID: {human_labels[sample_idx]}")
         y_labels_dict[lbl] = human_labels[sample_idx]
 
-y_labels_mapped = np.array([y_labels_dict[lbl] for lbl in y_labels])
+# Handle cases where merged_y_labels has more labels than y_labels_dict
+y_labels_mapped = []
+unmapped_labels = set()
 
+for lbl in merged_y_labels:
+    if lbl in y_labels_dict:
+        y_labels_mapped.append(y_labels_dict[lbl])
+    else:
+        # Use a default label for unmapped ground truth labels
+        y_labels_mapped.append('SXX')
+        unmapped_labels.add(lbl)
+
+y_labels_mapped = np.array(y_labels_mapped)
+
+if unmapped_labels:
+    print(f"\nWarning: Found {len(unmapped_labels)} unmapped ground truth labels: {sorted(unmapped_labels)}")
+    print(f"These samples will be labeled as 'UNKNOWN'")
+
+print(f"\nMapped Ground Truth Labels:")
+pprint.pprint(y_labels_dict)
+print(f'-------------------------------------\n')
 
 # --- Step 6: Compare with Ground Truth Labels ---
 print(f"\nGround Truth Comparison:")
@@ -401,17 +475,24 @@ propagated_counts = Counter(y_pred)
 print(f"GT label distribution: {gt_counts}")
 print(f"Label distribution before propagation: {original_counts}")
 print(f"Label distribution after propagation: {propagated_counts}")
+
+merged_stem_paths = [Path(p).stem for p in merged_paths]
+
 # Save results to a CSV
 results_df = pd.DataFrame({
-    'wav_stem': wav_stems,
+    'wav_stem': merged_stem_paths,
     'gt_label': y_labels_mapped,
-    'hdbscan_label': hdb_labels,
-    'hdbscan_prob': hdb_probs,
+    'hdbscan_label': merged_sample_labels,
+    'hdbscan_prob': merged_sample_probs,
     'lp_label': y_pred,
     'lp_confidence': confidence_scores
 })
 results_df.to_csv(output_folder_path / f"{run_id}_hdb_lp_results.csv", index=False)
 print(f"Results saved to {output_folder_path / f'{run_id}_hdb_lp_results.csv'}")
+
+n_clusters = len(set(merged_sample_labels)) - (1 if -1 in merged_sample_labels else 0)
+percentage_assigned = (np.sum(merged_sample_labels != -1) / n_samples) * 100
+
 # Save log
 with open(log_path, "w") as log_file:
     log_file.write(f"Number of clusters: {n_clusters}\n")
@@ -440,16 +521,70 @@ print(f"Log saved to {log_path}")
 plt.figure(figsize=(24, 8))
 
 plt.subplot(1, 3, 1)
-sns.scatterplot(x=umap_data[:, 0], y=umap_data[:, 1], hue=y_labels_mapped, palette='tab10', legend='full')
+# Count samples per label
+from collections import Counter
+label_counts = Counter(y_labels_mapped)
+unique_labels = np.unique(y_labels_mapped)
+# Create consistent color mapping
+palette = sns.color_palette('tab10', n_colors=len(unique_labels))
+label_to_color = {label: palette[i] for i, label in enumerate(unique_labels)}
+
+# Create color array for each point
+colors = [label_to_color[label] for label in y_labels_mapped]
+
+# Plot with explicit colors
+plt.scatter(merged_tsne_2d[:, 0], merged_tsne_2d[:, 1], c=colors, s=50, alpha=0.7)
+
+# Create custom legend with matching colors
+handles = [mlines.Line2D([], [], color=label_to_color[label], marker='o', linestyle='None', 
+                         markersize=8, label=f"{label} (n={label_counts[label]})") for label in unique_labels]
+plt.legend(handles=handles, title='Ground Truth', loc='best')
 plt.title('Ground Truth Labels')
+plt.xlabel('t-SNE 1')
+plt.ylabel('t-SNE 2')
 
 plt.subplot(1, 3, 2)
-sns.scatterplot(x=umap_data[:, 0], y=umap_data[:, 1], hue=hdb_labels, palette='tab10', legend='full')
+# Count HDBSCAN labels
+hdbscan_counts = Counter(merged_sample_labels)
+unique_hdbscan = np.unique(merged_sample_labels)
+palette_hdb = sns.color_palette('tab10', n_colors=len(unique_hdbscan))
+hdb_to_color = {label: palette_hdb[i] for i, label in enumerate(unique_hdbscan)}
+
+# Create color array for each point
+colors_hdb = [hdb_to_color[label] for label in merged_sample_labels]
+
+# Plot with explicit colors
+plt.scatter(merged_tsne_2d[:, 0], merged_tsne_2d[:, 1], c=colors_hdb, s=50, alpha=0.7)
+
+# Create custom legend with matching colors
+handles = [mlines.Line2D([], [], color=hdb_to_color[label], marker='o', linestyle='None',
+                         markersize=8, label=f"Cluster {label} (n={hdbscan_counts[label]})" if label != -1 else f"Noise (n={hdbscan_counts[label]})") 
+           for label in unique_hdbscan]
+plt.legend(handles=handles, title='HDBSCAN', loc='best')
 plt.title('HDBSCAN Clustering')
+plt.xlabel('t-SNE 1')
+plt.ylabel('t-SNE 2')
 
 plt.subplot(1, 3, 3)
-sns.scatterplot(x=umap_data[:, 0], y=umap_data[:, 1], hue=y_pred, palette='tab10', legend='full')
+# Count LP predictions
+lp_counts = Counter(y_pred)
+unique_lp = np.unique(y_pred)
+palette_lp = sns.color_palette('tab10', n_colors=len(unique_lp))
+lp_to_color = {label: palette_lp[i] for i, label in enumerate(unique_lp)}
+
+# Create color array for each point
+colors_lp = [lp_to_color[label] for label in y_pred]
+
+# Plot with explicit colors
+plt.scatter(merged_tsne_2d[:, 0], merged_tsne_2d[:, 1], c=colors_lp, s=50, alpha=0.7)
+
+# Create custom legend with matching colors
+handles = [mlines.Line2D([], [], color=lp_to_color[label], marker='o', linestyle='None',
+                         markersize=8, label=f"{label} (n={lp_counts[label]})") for label in unique_lp]
+plt.legend(handles=handles, title='Label Propagation', loc='best')
 plt.title('Label Propagation Results')
+plt.xlabel('t-SNE 1')
+plt.ylabel('t-SNE 2')
 
 plt.tight_layout()
 plt.savefig(output_folder_path / f"{run_id}_hdb_lp_gt_comparison.png", dpi=300, bbox_inches='tight')
@@ -458,5 +593,5 @@ plt.show()
 # save in log each wav name and its predicted label
 with open(log_path, "a") as log_file:
     log_file.write("\nDetailed Predictions:\n")
-    for stem, gt, hdb, hdbp, lp, lpc in zip(wav_stems, y_labels, hdb_labels, hdb_probs, y_pred, confidence_scores):
+    for stem, gt, hdb, hdbp, lp, lpc in zip(merged_stem_paths, merged_y_labels, merged_sample_labels, merged_sample_probs, y_pred, confidence_scores):
         log_file.write(f"{stem}: GT={gt}, HDBSCAN={hdb} (p={hdbp:.2f}), LP={lp} (conf={lpc:.2f})\n")

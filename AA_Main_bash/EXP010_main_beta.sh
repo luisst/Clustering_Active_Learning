@@ -72,6 +72,7 @@ export ENHANCE_RUN_ID="skipped"
 export current_stg3="${ROOT_PATH}/${DATASET_NAME}/STG_3/STG3_${EXP_NAME}-${VAD_NAME}-${FEAT_NAME}-${METHOD_NAME}"
 export STG3_MERGED_WAVS="${current_stg3}/merged_wavs"
 export STG3_AL_INPUT="${current_stg3}/AL_input_merged.csv"
+export STG3_FINAL_CSV="${current_stg3}/pred_output_${EXP_NAME}"
 
 export pca_elem="0"
 
@@ -81,10 +82,10 @@ export min_samples="5"
 
 export RUN_PARAMS="pca${pca_elem}_mcs${min_cluster_size}_ms${min_samples}_${hdb_mode}"
 
-cd $SRC_PATH
-if [ "$MOVE_ON" = "true" ]; then
-source ./BB_Stages_bash/STG3_META_HDB.sh
-fi
+# cd $SRC_PATH
+# if [ "$MOVE_ON" = "true" ]; then
+# source ./BB_Stages_bash/STG3_META_HDB.sh
+# fi
 
 
 #### Stage 4 LP

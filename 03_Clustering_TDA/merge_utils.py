@@ -109,7 +109,7 @@ def ffmpeg_split_audio(input_video, output_pth,
     return start_time_csv, stop_time_csv
 
 
-def active_learning_sample_selection(hdb_labels, hdb_probs, umap_data, n_samples_per_cluster=3, plot_flag=False):
+def active_learning_sample_selection(hdb_labels, hdb_probs, umap_data, output_folder_al, n_samples_per_cluster=3, plot_flag=False):
     """
     Select samples for manual labeling using Active Learning strategies.
     
@@ -261,7 +261,7 @@ def active_learning_sample_selection(hdb_labels, hdb_probs, umap_data, n_samples
         plt.ylabel('UMAP 2')
         plt.legend()
         plt.grid(True)
-        plt.show()
+        plt.savefig(output_folder_al / 'umap_active_learning_selected_samples.png')
     
     return selected_samples, selection_reasons
 
