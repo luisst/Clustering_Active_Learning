@@ -44,7 +44,9 @@ fi
 
 python3 ${SRC_PATH}/folder_verify.py $STG3_SEPARATED_MERGED_WAVS
 
-conda activate metaSR2
+conda activate metaSR3
+
+echo -e "prediction outputs will be saved in: $STG3_HDBSCAN_PRED_OUTPUT"
 
 ## Run the HDBSCAN prediction
 echo -e "\n\t>>>>> Stg3A HDB-SCAN pred: $STG3_HDBSCAN_PRED_OUTPUT\n"

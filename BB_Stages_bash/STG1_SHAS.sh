@@ -112,7 +112,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo -e "\n\t>>>>> Stage 1d: Silent Detector $STG1_RAW_CHUNKS_WAVS\n"
-conda activate metaSR2
+conda activate metaSR3
 export keep_perc="90"
 if [ "$SKIP_1D" != "true" ] && [ "$MOVE_ON" = "true" ]; then
 

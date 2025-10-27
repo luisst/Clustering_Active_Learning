@@ -1,8 +1,7 @@
 from pathlib import Path
 import csv
-from utilities_functions import get_total_video_length
+from merge_utils import get_total_video_length
 import argparse
-from utilities_functions import create_folder_if_missing
 import shutil
 import os
 import pickle
@@ -145,7 +144,7 @@ for current_wav_path in merged_wavs_files:
 
     # Create the output folder
     output_folder = separated_wav_folder.joinpath(predicted_label)
-    create_folder_if_missing(output_folder)
+    output_folder.mkdir(parents=True, exist_ok=True)
 
     # Create the output file
     output_file_path = output_folder.joinpath(f'{current_wav_path.stem}.wav')

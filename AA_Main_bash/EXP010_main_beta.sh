@@ -5,7 +5,9 @@ export ROOT_PATH="/home/luis/Dropbox/DATASETS_AUDIO/Unsupervised_Pipeline"
 export SRC_PATH=$(pwd)
 
 export EXP_NAME="EXP010"
-export DATASET_NAME="TTS4_easy"
+# export DATASET_NAME="TTS4_easy"
+export DATASET_NAME="TestAO-Irma"
+
 
 export VAD_NAME="SHAS"
 export FEAT_NAME="DV"

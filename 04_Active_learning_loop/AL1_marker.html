@@ -184,7 +184,6 @@
     }
 
     </style>
-    <link rel="stylesheet" href="AL1_styles.css">
     <link rel="shortcut icon" href="#">
 </head>
 <body>
@@ -244,7 +243,7 @@
     // Extract media extension
     var current_src_ext = current_srcName_url.split('.').pop();
 
-    if (current_src_ext.toLowerCase() !== 'mp4') {
+    if (current_src_ext.toLowerCase() == 'mp4') {
         videoUrl = `input_mp4s/${current_srcName_url}`;
     }
     console.log("Video URL:", videoUrl)
@@ -259,7 +258,7 @@
     started_flag = true;
 
     // Extract the filename without the extension
-    videoName = videoUrl.split('.')[0];
+    videoName = current_srcName_url.split('.')[0];
 
 
 

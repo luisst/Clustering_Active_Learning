@@ -124,7 +124,7 @@ if __name__ == "__main__":
     html_AL = "AL2_LP_webapp.html"
 
     LP_METHOD_NAME = "LP1"
-    DATASET_NAME = "TTS4_easy"
+    DATASET_NAME = "TestAO-Irma"
 
     base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline',DATASET_NAME)
     # base_path_ex = Path.home().joinpath('Library','CloudStorage','Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline',DATASET_NAME)
@@ -132,6 +132,7 @@ if __name__ == "__main__":
     stg1_wav_candidate_ex = base_path_ex.joinpath('input_wavs')
     stg4_al_folder_ex = base_path_ex.joinpath('STG_4',f'STG4_{LP_METHOD_NAME}')
     remote_server_root = base_path_ex
+    source_path = Path.home().joinpath('Dropbox', 'Source_2025', '04_Active_learning_loop')
 
     # For loop read csv files in stg4_al_folder_ex
     # Each csv file has columns: cluster_id, start_time, end_time
@@ -175,8 +176,7 @@ if __name__ == "__main__":
         print(f"Server root: {server_root}")
 
         # Source HTML path (where this script is located)
-        source_html_path = Path.home().joinpath('Dropbox', 'Source_2025', '04_Active_learning_loop') / html_AL
-        # source_html_path = Path.home().joinpath('Library', 'CloudStorage', 'Dropbox', 'Source_2025', '04_Active_learning_loop') / html_AL
+        source_html_path = source_path / html_AL
         
         # Ensure source HTML exists
         if not source_html_path.exists():

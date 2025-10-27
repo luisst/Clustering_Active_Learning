@@ -1,0 +1,22 @@
+conda create -n metaSR3 python=3.11
+
+# CUDA 12.6
+pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126
+
+pip3 install torchaudio
+
+pip install transformers
+pip install webrtcvad
+pip install librosa
+pip install tqdm
+pip install pandas
+pip install soundfile
+pip install pydub
+pip install scikit-learn
+pip install seaborn
+pip install hdbscan
+pip install Jinja2
+pip install umap-learn
+pip install matplotlib
+pip install torchinfo
+

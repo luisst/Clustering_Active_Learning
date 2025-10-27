@@ -110,11 +110,11 @@ def check_number_clusters(samples_prob, hdb_labels, verbose = True):
     return n_clusters, membership_percentage
 
 def gen_tsne(Mixed_X_data, Mixed_y_labels,
-             perplexity_val = 15, n_iter = 900,
+             perplexity_val = 15, max_iter = 900,
              n_comp = 108):
     
     if (n_comp == 0) or(n_comp > Mixed_X_data.shape[1]):
-        tsne = TSNE(n_components=2, verbose=False, perplexity=perplexity_val, n_iter=n_iter)
+        tsne = TSNE(n_components=2, verbose=False, perplexity=perplexity_val, max_iter=max_iter)
         tsne_results = tsne.fit_transform(Mixed_X_data)
         print(f'PCA before t-snePRE skipped')
     
@@ -124,7 +124,7 @@ def gen_tsne(Mixed_X_data, Mixed_y_labels,
         pca_selected = PCA(n_components=108)
         x_low_dim = pca_selected.fit_transform(data_standardized)
 
-        tsne = TSNE(n_components=2, verbose=False, perplexity=perplexity_val, n_iter=n_iter)
+        tsne = TSNE(n_components=2, verbose=False, perplexity=perplexity_val, max_iter=max_iter)
         tsne_results = tsne.fit_transform(x_low_dim)
 
     df_mixed = pd.DataFrame()

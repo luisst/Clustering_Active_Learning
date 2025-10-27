@@ -21,7 +21,7 @@ if [ $? -eq 1 ]; then
     export SKIP_ENH=true
 fi
 
-conda activate metaSR2
+conda activate metaSR3
 
 
 echo -e "\t>>>>> Stg2a Feature Extraction $STG2_MFCC_FILES"

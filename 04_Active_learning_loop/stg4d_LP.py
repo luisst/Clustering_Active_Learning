@@ -8,6 +8,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import pprint
 import mplcursors
+import sys
 
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score, accuracy_score, classification_report, confusion_matrix
 import matplotlib.pyplot as plt
@@ -26,43 +27,84 @@ from scipy.stats import entropy
 from scipy import sparse
 import csv
 
-def read_speaker_diarization(csv_file_path):
+
+def read_speaker_diarization(input_folder_AL):
     """
-    Reads a speaker diarization CSV file and returns a dictionary
+    Reads all speaker diarization CSV files from a folder and returns a dictionary
     mapping SampleIndex to SpeakerLP.
     
     Args:
-        csv_file_path (str): Path to the CSV file
+        input_folder_AL (str or Path): Path to the folder containing CSV files
         
     Returns:
         dict: Dictionary with SampleIndex as keys and SpeakerLP as values
         
     Example:
-        >>> speaker_dict = read_speaker_diarization('diarization_output.csv')
+        >>> speaker_dict = read_speaker_diarization('path/to/csv/folder')
         >>> print(speaker_dict)
         {101: 'S0', 7: 'S1', 81: 'S2', ...}
     """
+    from pathlib import Path
+    import csv
+    import sys
+    
     speaker_dict = {}
+    input_folder = Path(input_folder_AL)
     
-    try:
-        with open(csv_file_path, 'r', encoding='utf-8') as file:
-            csv_reader = csv.DictReader(file, delimiter='\t')
-            
-            for row in csv_reader:
-                sample_index = int(row['SampleIndex'])
-                speaker_lp = row['SpeakerLP']
-                speaker_dict[sample_index] = speaker_lp
+    if not input_folder.exists() or not input_folder.is_dir():
+        print(f"Error: Folder '{input_folder}' does not exist or is not a directory.")
+        sys.exit(1)
+    
+    # Find all CSV files in the folder
+    csv_files = list(input_folder.glob("*.csv"))
+    
+    if not csv_files:
+        print(f"Error: No CSV files found in '{input_folder}'")
+        sys.exit(1)
+    
+    print(f"Found {len(csv_files)} CSV files in '{input_folder}'")
+    
+    # Process each CSV file
+    for csv_file_path in csv_files:
+        print(f"Processing: {csv_file_path.name}")
+        
+        try:
+            with open(csv_file_path, 'r', encoding='utf-8') as file:
+                csv_reader = csv.DictReader(file, delimiter='\t')
                 
-    except FileNotFoundError:
-        print(f"Error: File '{csv_file_path}' not found.")
-        return {}
-    except KeyError as e:
-        print(f"Error: Missing expected column {e}")
-        return {}
-    except Exception as e:
-        print(f"Error reading CSV: {e}")
-        return {}
+                file_count = 0
+                for row in csv_reader:
+                    try:
+                        sample_index = int(row['SampleIndex'])
+                        speaker_lp = row['SpeakerLP']
+                        
+                        # Check for duplicate indices
+                        if sample_index in speaker_dict:
+                            print(f"Warning: Duplicate SampleIndex {sample_index} found in {csv_file_path.name}. "
+                                  f"Existing: {speaker_dict[sample_index]}, New: {speaker_lp}")
+                        
+                        speaker_dict[sample_index] = speaker_lp
+                        file_count += 1
+                        
+                    except (ValueError, KeyError) as e:
+                        print(f"Error processing row in {csv_file_path.name}: {e}")
+                        print("Exiting program due to data processing error.")
+                        sys.exit(1)
+                
+                print(f"  Added {file_count} entries from {csv_file_path.name}")
+                        
+        except FileNotFoundError:
+            print(f"Error: File '{csv_file_path}' not found.")
+            sys.exit(1)
+        except Exception as e:
+            print(f"Error reading CSV '{csv_file_path}': {e}")
+            sys.exit(1)
     
+    if not speaker_dict:
+        print("Error: No valid data loaded from CSV files.")
+        sys.exit(1)
+    
+    print(f"Total entries loaded: {len(speaker_dict)}")
     return speaker_dict
 
 def calculate_mst_from_features(X_data, metric='euclidean', return_format='coo'):
@@ -140,13 +182,15 @@ def calculate_mst_from_features(X_data, metric='euclidean', return_format='coo')
         raise ValueError("return_format must be 'coo' or 'edges'")
 
 
-base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline','TTS4_easy')
+
+LP_METHOD_NAME = "LP1"
+DATASET_NAME = "TestAO-Irma"
+
+base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline',DATASET_NAME)
 stg3_pred_folders_ex = base_path_ex.joinpath('STG_3','STG3_EXP010-SHAS-DV-hdb','merged_wavs')
-stg4_al_folder_ex = base_path_ex.joinpath('STG_4','STG4_LP1','webapp_results')
+stg4_al_folder_ex = base_path_ex.joinpath('STG_4',f'STG4_{LP_METHOD_NAME}','webapp_results')
 
 merged_data_clusters_pickle = stg3_pred_folders_ex.parent / 'merged_clustering_data.pickle'
-
-webapp_csv_output_path = stg4_al_folder_ex / 'tts4_easy_labels.csv'
 
 output_folder_path = stg4_al_folder_ex.parent / 'lp_results'
 output_folder_path.mkdir(parents=True, exist_ok=True)
@@ -177,7 +221,7 @@ max_iter=100
 
 tol=1e-6
 # TODO: load human_labels from AL webapp
-human_labels = read_speaker_diarization(webapp_csv_output_path)
+human_labels = read_speaker_diarization(stg4_al_folder_ex)
 # human_labels = {0: 'Ari', 40: 'Ed', 75: 'Eve', 120: 'Jad', 170: 'Lan',
 #                 25: 'Ari', 55: 'Ed', 96: 'Eve', 140: 'Jad'}  # Example: index to speaker ID
 
