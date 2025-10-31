@@ -13,7 +13,7 @@ cd $SRC_PATH
 
 python3 ${SRC_PATH}/folder_verify.py $STG4_METRICS
 
-export min_overlap_percentage="0.3"
+# export min_overlap_percentage="0.3"
 
 echo -e "\n\t>>>>> Using the CSV files from: $STG3_FINAL_CSV \n"
 echo -e "\n\t>>>>> Results stored in: $STG4_METRICS\n"

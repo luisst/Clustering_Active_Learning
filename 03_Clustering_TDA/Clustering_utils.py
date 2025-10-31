@@ -134,6 +134,7 @@ def gen_tsne(Mixed_X_data, Mixed_y_labels,
 
     return df_mixed
 
+
 def plot_clustering(X, labels, probabilities=None, parameters=None, 
                     ground_truth=False, ax=None,
                     remove_outliers = False,
@@ -182,25 +183,34 @@ def plot_clustering(X, labels, probabilities=None, parameters=None,
     title = title 
     ax.set_title(title)
 
-    # # Add legend with the number of labels for each cluster
-    # legend_labels = [f"C{k}: {list(labels).count(k)}" for k in unique_labels]
-    legend_labels = [f": {list(labels).count(k)}" for k in unique_labels]
-
-    # Customizing the legend to not display the marker
+    # Create different legends based on ground_truth flag
     legend_without_symbol = []
-    for idx, label_id in enumerate(unique_labels):
-        if label_id != -1:
-            current_lbl_color = colors[idx]
-            current_label = legend_labels[idx]
-            legend_without_symbol.append(mlines.Line2D([], [], color=current_lbl_color,
-                                                        marker='o', 
-                                                        # linestyle='solid', 
-                                                        label=current_label))
-    plt.legend(handles=legend_without_symbol)
-
-    # ax.legend(legend_labels, labelcolor=colors)
+    
+    if ground_truth:
+        # Ground truth legend: show label name only (no count)
+        for idx, label_id in enumerate(unique_labels):
+            if label_id != -1:
+                current_lbl_color = colors[idx]
+                legend_without_symbol.append(mlines.Line2D([], [], color=current_lbl_color,
+                                                            marker='o', 
+                                                            label=f"{label_id}"))
+        # Add legend with transparency and specific location
+        ax.legend(handles=legend_without_symbol, loc='upper right', 
+                 framealpha=0.7, fontsize=8)
+    else:
+        # Prediction legend: show count
+        legend_labels = [f": {list(labels).count(k)}" for k in unique_labels]
+        for idx, label_id in enumerate(unique_labels):
+            if label_id != -1:
+                current_lbl_color = colors[idx]
+                current_label = legend_labels[idx]
+                legend_without_symbol.append(mlines.Line2D([], [], color=current_lbl_color,
+                                                            marker='o', 
+                                                            label=current_label))
+        ax.legend(handles=legend_without_symbol, loc='upper right', 
+                 framealpha=0.7, fontsize=8)
+    
     plt.tight_layout()
-
 
 def plot_clustering_dual(x_tsne_2d, Mixed_y_labels,
                          samples_label, samples_prob,

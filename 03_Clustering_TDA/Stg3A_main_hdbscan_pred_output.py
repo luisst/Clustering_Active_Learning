@@ -38,12 +38,15 @@ def valid_path(path):
     else:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
-base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline','MiniClusters')
-feats_pickle_ex = base_path_ex.joinpath('STG_2','STG2_EXP010-SHAS-DV','MiniClusters_SHAS_DV_featsEN.pickle')
+base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline','TestAO-Irma')
+feats_pickle_ex = base_path_ex.joinpath('STG_2','STG2_EXP010-SHAS-DV','TestAO-Irma_SHAS_DV_feats.pickle')
 
-output_folder_path_ex = Path('/home/luis/Dropbox/DATASETS_AUDIO/Unsupervised_Pipeline/dv2')
+output_folder_path_ex = base_path_ex.joinpath('STG_3','STG3A_HDBSCAN_PRED') 
+# Create the output directory if it doesn't exist
+output_folder_path_ex.mkdir(parents=True, exist_ok=True)
+
 run_params_ex = f"pca{pca_elem}_mcs{min_cluster_size}_ms{min_samples}_{hdb_mode}"
-Exp_name_ex = 'TestAO-IrmaR'
+Exp_name_ex = 'TestAO-Irma'
 clusters_data_pickle_ex = output_folder_path_ex / 'clusters_data.pickle'
 reduced_features_pickle_ex = output_folder_path_ex / 'reduced_features.pickle'
 pred_label_pickle_ex = output_folder_path_ex / 'pred_label.pickle'

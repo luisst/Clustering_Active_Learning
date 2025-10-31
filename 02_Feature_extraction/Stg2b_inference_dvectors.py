@@ -78,8 +78,16 @@ Mixed_X_data = X_train
 Mixed_y_labels = y_train
 
 sample_path = X_train_paths[0]
-print(f'Example path: {sample_path}, type: {type(sample_path)}')
 
 X_data_and_labels = [X_train, X_train_paths, y_train]
 with open(f'{feats_pickle_path}', "wb") as file:
     pickle.dump(X_data_and_labels, file)
+
+# Export dictionary keys and values speaker_labels_dict_train to a text file
+list_of_keys = list(speaker_labels_dict_train.keys())
+list_of_values = list(speaker_labels_dict_train.values())
+dict_path = feats_pickle_path.parent / 'speaker_labels_dict.txt'
+with open(dict_path, 'w', encoding='utf-8') as f:
+    for key, value in zip(list_of_keys, list_of_values):
+        f.write(f"{key}: {value}\n")
+

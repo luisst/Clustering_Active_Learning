@@ -30,7 +30,16 @@ if len(list_of_wavs) == 0:
     sys.exit("No files to process")
 
 count = 0
+list_of_labels = []
 for current_wav_path in list_of_wavs:
-    extract_MFB_aolme(current_wav_path, output_feats_folder)
+    current_GT_label = extract_MFB_aolme(current_wav_path, output_feats_folder)
+    list_of_labels.append(current_GT_label)
     count = count + 1
     print(f'{count} - feature extraction: {current_wav_path.name}')
+
+# Export labels to a text file
+labels_file_path = output_feats_folder.parent / 'feat_extraction_labels.txt'
+with open(labels_file_path, 'w', encoding='utf-8') as f:
+    for label in list_of_labels:
+        f.write(f"{label}\n")
+print(f'Speaker labels saved to: {labels_file_path}') 

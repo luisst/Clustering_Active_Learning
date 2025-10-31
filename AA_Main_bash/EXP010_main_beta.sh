@@ -4,7 +4,7 @@ export MOVE_ON=true
 export ROOT_PATH="/home/luis/Dropbox/DATASETS_AUDIO/Unsupervised_Pipeline"
 export SRC_PATH=$(pwd)
 
-export EXP_NAME="EXP010"
+export EXP_NAME="EXP011"
 # export DATASET_NAME="TTS4_easy"
 export DATASET_NAME="TestAO-Irma"
 
@@ -20,7 +20,7 @@ export SILENT_DET_FLAG=true
 export ENHANCE_FLAG=false
 
 ## If GT_CSV_FOLDER is provided, predict_only will be set to false
-export GT_CSV_FOLDER="${ROOT_PATH}/${DATASET_NAME}/GT_final/"
+export GT_CSV_FOLDER="${ROOT_PATH}/${DATASET_NAME}/GT_final/filtered_GT"
 if [ -d "$GT_CSV_FOLDER" ]; then
     export PREDICT_ONLY=false
 else
@@ -42,10 +42,10 @@ export STG2_ENH_PRETRAINED="${SRC_PATH}/pre-trained/model_S1_256_hard_betaNO4_ma
 
 ## Segmentation Parameters
 export seg_ln="1.0"
-export step_size="0.3"
-export gap_size="0.4"
+export step_size="0.2"
+export gap_size="0.2"
 export consc_th="1"
-export min_overlap_percentage="0.3"
+export min_overlap_percentage="0.8"
 
 export DT_THRESHOLD="0.8"
 
@@ -91,7 +91,7 @@ export RUN_PARAMS="pca${pca_elem}_mcs${min_cluster_size}_ms${min_samples}_${hdb_
 
 
 #### Stage 4 LP
-export LP_METHOD_NAME="LP1"
+export LP_METHOD_NAME="LP1G2"
 export current_stg4="${ROOT_PATH}/${DATASET_NAME}/STG_4/STG4_${LP_METHOD_NAME}"
 export STG4_HUMAN="${current_stg4}/webapp_results"
 

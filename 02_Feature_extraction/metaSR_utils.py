@@ -392,15 +392,14 @@ def extract_MFB_aolme(current_input_path, output_feats_folder):
 
     # Verify curent_input_path has 3 substrings separated by '_'
     current_label = current_input_path.stem.split('_')[-3]
-
-    
     print(f'current_label: {current_label}')
-        
-    
+
     feat_and_label = {'feat':total_features, 'label':current_label}
 
     with open(curent_output_path, 'wb') as fp:
         pickle.dump(feat_and_label, fp)
+    
+    return current_label
 
 
 def load_model_predict(pretrained_path, n_classes, use_cuda = True):
@@ -508,7 +507,10 @@ def convert_dict_to_tensor(dict_data_input):
 
     speaker_labels_dict = dict([(y,x) for x,y in enumerate(sorted(set(labels_list)))])
     if 'noises' in speaker_labels_dict.keys():
-        speaker_labels_dict['noises'] = 6
+        speaker_labels_dict['noises'] = 99 
+    
+    if 'spkNoise' in speaker_labels_dict.keys():
+        speaker_labels_dict['spkNoise'] = 88 
 
     y_lbls = [speaker_labels_dict[x] for x in labels_list]
     y_data = np.array(y_lbls)
@@ -572,8 +574,6 @@ def separate_dict_embeddings(dict_embeddings, percentage_test,
     X_test, y_test, X_test_path, speaker_labels_dict_test = convert_dict_to_tensor(dict_test_data)
     X_train, y_train, X_train_path, speaker_labels_dict_train = convert_dict_to_tensor(dict_train_data)
 
-    if speaker_labels_dict_test != speaker_labels_dict_test:
-        sys.error('speaker_labels_dict from Train and Test are not the same')
 
     if return_paths:
         return X_train, y_train, X_train_path, X_test, y_test, X_test_path, speaker_labels_dict_train
@@ -628,6 +628,15 @@ def d_vectors_pretrained_model(feats_folder, percentage_test,
                                          list_of_wavs,
                                          norm_flag=norm_flag, use_pkl_label=use_pkl_label)
 
+    # Extract keys from dict_embeddings
+    list_of_keys = list(dict_embeddings.keys())
+
+    # Export keys to a text file and counts of each file with that key
+    output_keys_file = feats_folder.parent / 'dict_embeddings_keys_counts.txt'
+
+    with open(output_keys_file, 'w', encoding='utf-8') as file:
+        for key in list_of_keys:
+            file.write(f"{key}: {len(dict_embeddings[key])}\n")
 
     return separate_dict_embeddings(dict_embeddings, 
                                     percentage_test,

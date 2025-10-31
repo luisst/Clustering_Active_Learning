@@ -47,47 +47,47 @@ export VAD_ROOT="${VAD_LOCATION}/repo"
 export path_to_yaml_file="${path_to_yaml_folder}/VAD_${EXP_NAME}.yaml"
 
 
-echo -e "\n\t>>>>> Stage1vad: $STG1_WAVS\n"
-if [ "$SKIP_VAD" != "true" ]; then
-    python3 ${VAD_ROOT}/src/supervised_hybrid/segment.py -wavs $STG1_WAVS -ckpt $STG1_VAD_PRETRAINED -yaml $path_to_yaml_file -max 10
-    echo -e "\t>>>>> VAD output: $path_to_yaml_file"
-else
-    echo -e "\n\t>>>>> Stage1: VAD skipped\n"
-fi
+# echo -e "\n\t>>>>> Stage1vad: $STG1_WAVS\n"
+# if [ "$SKIP_VAD" != "true" ]; then
+#     python3 ${VAD_ROOT}/src/supervised_hybrid/segment.py -wavs $STG1_WAVS -ckpt $STG1_VAD_PRETRAINED -yaml $path_to_yaml_file -max 10
+#     echo -e "\t>>>>> VAD output: $path_to_yaml_file"
+# else
+#     echo -e "\n\t>>>>> Stage1: VAD skipped\n"
+# fi
 
-echo -e "\n\t>>>>> Stage1a: $path_to_yaml_file\n"
-cd $SRC_PATH
-if [ "$SKIP_1A" != "true" ]; then
-    python3 ${SRC_PATH}/01_VAD_chunks/Stage1a_convert_shasYML_csv.py $path_to_yaml_file $STG1_VAD_CSV
-    echo -e "\t>>>>> Converted to CSV: $STG1_VAD_CSV"
-else
-    echo -e "\n\t>>>>> Stage1a: Conversion skipped\n"
-fi
+# echo -e "\n\t>>>>> Stage1a: $path_to_yaml_file\n"
+# cd $SRC_PATH
+# if [ "$SKIP_1A" != "true" ]; then
+#     python3 ${SRC_PATH}/01_VAD_chunks/Stage1a_convert_shasYML_csv.py $path_to_yaml_file $STG1_VAD_CSV
+#     echo -e "\t>>>>> Converted to CSV: $STG1_VAD_CSV"
+# else
+#     echo -e "\n\t>>>>> Stage1a: Conversion skipped\n"
+# fi
 
-if [ $? -ne 0 ]; then
-    export MOVE_ON=false
-    echo "Move on: $MOVE_ON"
-    return 1
-fi
+# if [ $? -ne 0 ]; then
+#     export MOVE_ON=false
+#     echo "Move on: $MOVE_ON"
+#     return 1
+# fi
 
-echo -e "before Metrics"
+# echo -e "before Metrics"
 
-if [ "$PREDICT_ONLY" = "true" ] && [ "$MOVE_ON" = "true" ]; then
-echo -e "\n\t>>>>> Stage 1b: Metrics \n"
-export VAD_metric_folder="${ROOT_PATH}/${DATASET_NAME}/STG_1/STG1_${VAD_NAME}/metrics"
-python3 ${SRC_PATH}/folder_verify.py $VAD_metric_folder
+# if [ "$PREDICT_ONLY" = "true" ] && [ "$MOVE_ON" = "true" ]; then
+# echo -e "\n\t>>>>> Stage 1b: Metrics \n"
+# export VAD_metric_folder="${ROOT_PATH}/${DATASET_NAME}/STG_1/STG1_${VAD_NAME}/metrics"
+# python3 ${SRC_PATH}/folder_verify.py $VAD_metric_folder
 
-export VAD_pred_ext="txt"
-export vad_method="shas"
+# export VAD_pred_ext="txt"
+# export vad_method="shas"
 
-python3 ${SRC_PATH}/01_VAD_chunks/Stage1b_metric_vad.py --csv_pred_folder $STG1_VAD_CSV\
- --GT_csv_folder $GT_CSV_FOLDER\
- --audios_folder $STG1_WAVS\
- --metric_output_folder $VAD_metric_folder\
- --pred_extensions $VAD_pred_ext\
- --method_name $vad_method\
- --run_name $VAD_NAME
-fi
+# python3 ${SRC_PATH}/01_VAD_chunks/Stage1b_metric_vad.py --csv_pred_folder $STG1_VAD_CSV\
+#  --GT_csv_folder $GT_CSV_FOLDER\
+#  --audios_folder $STG1_WAVS\
+#  --metric_output_folder $VAD_metric_folder\
+#  --pred_extensions $VAD_pred_ext\
+#  --method_name $vad_method\
+#  --run_name $VAD_NAME
+# fi
 
 
 echo -e "\n\t>>>>> Stage1c: Divide into chunks $STG1_WAVS \n"
