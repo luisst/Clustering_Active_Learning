@@ -4,7 +4,7 @@ export MOVE_ON=true
 export ROOT_PATH="/home/luis/Dropbox/DATASETS_AUDIO/Unsupervised_Pipeline"
 export SRC_PATH=$(pwd)
 
-export EXP_NAME="EXP011"
+export EXP_NAME="EXP010"
 # export DATASET_NAME="TTS4_easy"
 export DATASET_NAME="TestAO-Irma"
 
@@ -84,22 +84,22 @@ export min_samples="5"
 
 export RUN_PARAMS="pca${pca_elem}_mcs${min_cluster_size}_ms${min_samples}_${hdb_mode}"
 
-# cd $SRC_PATH
-# if [ "$MOVE_ON" = "true" ]; then
-# source ./BB_Stages_bash/STG3_META_HDB.sh
-# fi
+cd $SRC_PATH
+if [ "$MOVE_ON" = "true" ]; then
+source ./BB_Stages_bash/STG3_META_HDB.sh
+fi
 
 
 #### Stage 4 LP
-export LP_METHOD_NAME="LP1G2"
+export LP_METHOD_NAME="LP1"
 export current_stg4="${ROOT_PATH}/${DATASET_NAME}/STG_4/STG4_${LP_METHOD_NAME}"
 export STG4_HUMAN="${current_stg4}/webapp_results"
 
 
-cd $SRC_PATH
-if [ "$MOVE_ON" = "true" ]; then
-    source ./BB_Stages_bash/STG4_LP.sh
-fi
+# cd $SRC_PATH
+# if [ "$MOVE_ON" = "true" ]; then
+#     source ./BB_Stages_bash/STG4_LP.sh
+# fi
 
 ## Add Azure comparison
 

@@ -5,6 +5,8 @@ import os
 import argparse
 import shutil
 import numpy as np
+
+from clustering_utils import plot_clustering_dual
 from merge_utils import ffmpeg_split_audio, create_folder_if_missing\
     , active_learning_sample_selection, format_active_learning_results
 
@@ -341,6 +343,14 @@ merged_y_labels = np.array(merged_y_labels)
 merged_sample_labels = np.array(merged_sample_labels)
 merged_sample_probs = np.array(merged_sample_probs)
 merged_sample_outliers = np.array(merged_sample_outliers)
+
+# Plot sample chunks and merged samples comparison
+
+current_run_id = f'{exp_name}_merged_samples'
+plot_clustering_dual(x_tsne_2d, merged_y_labels,
+                        merged_sample_labels, merged_sample_probs,
+                        current_run_id, output_merged_audio.parent,
+                        'store')
 
 # Create the merged clustering data
 merged_clustering_data = [

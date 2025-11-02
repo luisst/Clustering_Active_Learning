@@ -43,7 +43,6 @@ feats_pickle_ex = base_path_ex.joinpath('STG_2','STG2_EXP010-SHAS-DV','TestAO-Ir
 
 output_folder_path_ex = base_path_ex.joinpath('STG_3','STG3A_HDBSCAN_PRED') 
 # Create the output directory if it doesn't exist
-output_folder_path_ex.mkdir(parents=True, exist_ok=True)
 
 run_params_ex = f"pca{pca_elem}_mcs{min_cluster_size}_ms{min_samples}_{hdb_mode}"
 Exp_name_ex = 'TestAO-Irma'

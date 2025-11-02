@@ -120,6 +120,6 @@ with torch.no_grad():
                 end_time = wav_path_parts[-1]
                 # write confidence with 2 decimal points
                 current_conf = round(conf.item(), 2)
-                f.write(f"{wav_path.name}\t{start_time}\t{end_time}\t{pred.item()}\t{current_conf}\n")
+                f.write(f"{wav_path.name},{start_time},{end_time},{pred.item()},{current_conf}\n")
 
 

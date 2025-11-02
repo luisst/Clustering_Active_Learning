@@ -138,6 +138,7 @@ def gen_tsne(Mixed_X_data, Mixed_y_labels,
 def plot_clustering(X, labels, probabilities=None, parameters=None, 
                     ground_truth=False, ax=None,
                     remove_outliers = False,
+                    spkNoise_flag = False,
                     add_gt_prd_flag = True):
 
     if ax is None:
@@ -156,9 +157,15 @@ def plot_clustering(X, labels, probabilities=None, parameters=None,
             col = [0, 0, 0, 1]
             if remove_outliers:
                 continue
+        
+        if spkNoise_flag and k == 88:
+            continue
 
         class_index = np.where(labels == k)[0]
         for ci in class_index:
+            # Set alpha to 0.2 if label is 88, otherwise use default (1.0)
+            alpha_value = 0.2 if k == 88 else 1.0
+
             ax.plot(
                 X[ci, 0],
                 X[ci, 1],
@@ -166,6 +173,7 @@ def plot_clustering(X, labels, probabilities=None, parameters=None,
                 markerfacecolor=tuple(col),
                 markeredgecolor="k",
                 markersize=4 if k == -1 else 1 + 5 * proba_map[ci],
+                alpha=alpha_value
             )
     n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
     if ground_truth:
@@ -187,13 +195,20 @@ def plot_clustering(X, labels, probabilities=None, parameters=None,
     legend_without_symbol = []
     
     if ground_truth:
-        # Ground truth legend: show label name only (no count)
+        # Ground truth legend: show label name, color, and count
         for idx, label_id in enumerate(unique_labels):
             if label_id != -1:
+                # Skip label 88 if spkNoise_flag is True
+                if spkNoise_flag and label_id == 88:
+                    continue
+                    
                 current_lbl_color = colors[idx]
+                label_count = list(labels).count(label_id)
+                
+                # Format: "Label ID (n=count)"
                 legend_without_symbol.append(mlines.Line2D([], [], color=current_lbl_color,
                                                             marker='o', 
-                                                            label=f"{label_id}"))
+                                                            label=f"{label_id} (n={label_count})"))
         # Add legend with transparency and specific location
         ax.legend(handles=legend_without_symbol, loc='upper right', 
                  framealpha=0.7, fontsize=8)
@@ -224,6 +239,7 @@ def plot_clustering_dual(x_tsne_2d, Mixed_y_labels,
 
     combined_fig, axes = plt.subplots(1, 2, figsize=(12, 6))
     plot_clustering(x_tsne_2d, labels=Mixed_y_labels, ground_truth=True,
+                    spkNoise_flag = True,
                     ax=axes[0])
 
     plot_clustering(x_tsne_2d, labels=samples_label,
@@ -245,6 +261,24 @@ def plot_clustering_dual(x_tsne_2d, Mixed_y_labels,
         plt.show()
     else:
         print(f'Error! plot_histogam plot_mode')
+    
+    # Plot extra figure if 88 label is present
+    if 88 in Mixed_y_labels:
+        print('Plotting extra figure without speaker noise (label 88)')
+        combined_fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+        plot_clustering(x_tsne_2d, labels=Mixed_y_labels, ground_truth=True,
+                        spkNoise_flag = False,
+                        ax=axes[0])
+
+        plot_clustering(x_tsne_2d, labels=samples_label,
+                        probabilities = samples_prob,
+                        remove_outliers = True, ax=axes[1])
+
+        current_fig_path = output_folder_path.joinpath(f'{run_id}_GTlabels.png') 
+
+        combined_fig.suptitle(f'{run_id}', fontsize=14)
+        plt.tight_layout()
+        combined_fig.savefig(current_fig_path, dpi=300)
 
 
 def organize_samples_by_label(X_test_paths, samples_label, samples_prob, wav_chunks_output_path):

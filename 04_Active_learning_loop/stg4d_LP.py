@@ -181,7 +181,329 @@ def calculate_mst_from_features(X_data, metric='euclidean', return_format='coo')
     else:
         raise ValueError("return_format must be 'coo' or 'edges'")
 
+def create_propagation_animation(merged_tsne_2d, human_labels, merged_sample_labels, 
+                                  merged_sample_probs, cluster_to_speaker, id_to_idx,
+                                  W, Y, alpha, max_iter, tol, output_folder_path, run_id,
+                                  manual_anchor_strength=0.2, weak_anchor_strength=0.05,
+                                  min_confidence_threshold=0.7, speaker_ids=None):
+    """
+    Create frame-by-frame animation of label propagation.
+    
+    Parameters:
+    -----------
+    merged_tsne_2d : numpy.ndarray
+        t-SNE 2D coordinates
+    human_labels : dict
+        Manual labels from user {index: speaker_id}
+    merged_sample_labels : numpy.ndarray
+        HDBSCAN cluster assignments
+    merged_sample_probs : numpy.ndarray
+        HDBSCAN membership probabilities
+    cluster_to_speaker : dict
+        Mapping from HDBSCAN cluster to speaker
+    id_to_idx : dict
+        Mapping from speaker ID to class index
+    W : scipy.sparse matrix
+        Normalized adjacency matrix
+    Y : numpy.ndarray
+        Initial label distributions
+    alpha : float
+        Propagation strength
+    max_iter : int
+        Maximum iterations
+    tol : float
+        Convergence tolerance
+    output_folder_path : Path
+        Output directory
+    run_id : str
+        Run identifier
+    manual_anchor_strength : float
+        Anchoring strength for manual labels
+    weak_anchor_strength : float
+        Anchoring strength for HDBSCAN priors
+    min_confidence_threshold : float
+        Minimum HDBSCAN confidence
+    speaker_ids : list
+        List of speaker IDs
+    
+    Returns:
+    --------
+    F : numpy.ndarray
+        Final propagated label distributions
+    frames_folder : Path
+        Path to folder containing frames
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.lines as mlines
+    from matplotlib.animation import FuncAnimation
+    import numpy as np
+    from pathlib import Path
+    
+    # Create subfolder for frames
+    frames_folder = output_folder_path / f"{run_id}_propagation_frames"
+    frames_folder.mkdir(parents=True, exist_ok=True)
+    
+    n_samples = merged_tsne_2d.shape[0]
+    n_classes = len(speaker_ids)
+    idx_to_id = {v: k for k, v in id_to_idx.items()}
+    
+    # Color mapping for consistency
+    palette = sns.color_palette('tab10', n_colors=len(speaker_ids))
+    speaker_to_color = {spk: palette[i] for i, spk in enumerate(speaker_ids)}
+    
+    # Track convergence metrics
+    convergence_history = []
+    entropy_history = []
+    confidence_history = []
+    
+    # Initialize propagation
+    F = Y.copy()
+    
+    print(f"\nCreating propagation animation frames...")
+    print(f"Frames will be saved to: {frames_folder}")
+    
+    for it in range(max_iter):
+        # Store previous state for convergence calculation
+        F_prev = F.copy()
+        
+        # Propagation step
+        F_new = alpha * W.dot(F)
+        
+        # Add strong anchoring for manually labeled samples
+        for idx, spk in human_labels.items():
+            speaker_idx = id_to_idx[spk]
+            F_new[idx] = (1 - manual_anchor_strength) * F_new[idx]
+            F_new[idx, speaker_idx] += manual_anchor_strength
+        
+        # Add weak anchoring for HDBSCAN priors
+        for i in range(n_samples):
+            if i in human_labels:
+                continue
+                
+            hdb_cluster = merged_sample_labels[i]
+            hdb_confidence = merged_sample_probs[i]
+            
+            if (hdb_cluster != -1 and 
+                hdb_cluster in cluster_to_speaker and 
+                hdb_confidence >= min_confidence_threshold):
+                
+                speaker = cluster_to_speaker[hdb_cluster]
+                speaker_idx = id_to_idx[speaker]
+                
+                anchor_weight = weak_anchor_strength * hdb_confidence
+                F_new[i] = (1 - anchor_weight) * F_new[i]
+                F_new[i, speaker_idx] += anchor_weight
+        
+        # Normalize rows
+        row_sums = F_new.sum(axis=1, keepdims=True)
+        row_sums[row_sums == 0] = 1
+        F_new = F_new / row_sums
+        
+        # Calculate metrics
+        delta = np.abs(F_new - F_prev).sum()
+        convergence_history.append(delta)
+        
+        # Calculate average entropy (measure of uncertainty)
+        eps = 1e-10
+        sample_entropy = -np.sum(F_new * np.log(F_new + eps), axis=1)
+        avg_entropy = np.mean(sample_entropy)
+        entropy_history.append(avg_entropy)
+        
+        # Calculate average confidence
+        confidence_scores = np.max(F_new, axis=1)
+        avg_confidence = np.mean(confidence_scores)
+        confidence_history.append(avg_confidence)
+        
+        F = F_new
+        
+        # Get current predictions
+        y_current = np.argmax(F, axis=1)
+        y_current_labels = np.array([idx_to_id[i] for i in y_current])
+        
+        # Create frame every iteration (or every N iterations for large max_iter)
+        save_frame = True
+        if max_iter > 100:
+            # Only save every 5th frame if we have too many iterations
+            save_frame = (it % 5 == 0) or (it == max_iter - 1)
+        
+        if save_frame:
+            # Create figure with subplots
+            fig = plt.figure(figsize=(20, 10))
+            gs = fig.add_gridspec(2, 3, hspace=0.3, wspace=0.3)
+            
+            # Main plot: t-SNE with current predictions
+            ax_main = fig.add_subplot(gs[:, :2])
+            
+            # Create colors for points
+            colors = [speaker_to_color[label] for label in y_current_labels]
+            
+            # Separate manual labels and propagated labels
+            manual_indices = list(human_labels.keys())
+            propagated_indices = [i for i in range(n_samples) if i not in manual_indices]
+            
+            # Plot propagated labels with transparency based on confidence
+            for i in propagated_indices:
+                conf = confidence_scores[i]
+                ax_main.scatter(merged_tsne_2d[i, 0], merged_tsne_2d[i, 1], 
+                              c=[colors[i]], s=50, alpha=0.3 + 0.6*conf, edgecolors='none')
+            
+            # Plot manual labels with stars and borders
+            if manual_indices:
+                ax_main.scatter(merged_tsne_2d[manual_indices, 0], 
+                              merged_tsne_2d[manual_indices, 1],
+                              c=[colors[i] for i in manual_indices],
+                              s=200, alpha=1.0, marker='*', 
+                              edgecolors='black', linewidths=2,
+                              label='Manual Labels', zorder=10)
+            
+            # Create legend
+            handles = [mlines.Line2D([], [], color=speaker_to_color[spk], marker='o', 
+                                    linestyle='None', markersize=10, label=spk) 
+                      for spk in speaker_ids]
+            handles.append(mlines.Line2D([], [], color='gray', marker='*', 
+                                        linestyle='None', markersize=15, 
+                                        markeredgecolor='black', markeredgewidth=2,
+                                        label='Manual Labels'))
+            ax_main.legend(handles=handles, title='Speakers', loc='best')
+            
+            ax_main.set_title(f'Label Propagation - Iteration {it+1}/{max_iter}', 
+                            fontsize=14, fontweight='bold')
+            ax_main.set_xlabel('t-SNE 1')
+            ax_main.set_ylabel('t-SNE 2')
+            
+            # Top right: Convergence plot
+            ax_conv = fig.add_subplot(gs[0, 2])
+            ax_conv.plot(convergence_history, linewidth=2, color='blue')
+            ax_conv.axhline(y=tol, color='red', linestyle='--', label=f'Tolerance ({tol})')
+            ax_conv.set_xlabel('Iteration')
+            ax_conv.set_ylabel('Delta (Change)')
+            ax_conv.set_title('Convergence')
+            ax_conv.legend()
+            ax_conv.grid(True, alpha=0.3)
+            ax_conv.set_yscale('log')
+            
+            # Middle right: Confidence and Entropy
+            ax_metrics = fig.add_subplot(gs[1, 2])
+            ax_metrics_twin = ax_metrics.twinx()
+            
+            line1 = ax_metrics.plot(confidence_history, linewidth=2, color='green', 
+                                   label='Avg Confidence')
+            ax_metrics.set_xlabel('Iteration')
+            ax_metrics.set_ylabel('Average Confidence', color='green')
+            ax_metrics.tick_params(axis='y', labelcolor='green')
+            
+            line2 = ax_metrics_twin.plot(entropy_history, linewidth=2, color='orange', 
+                                        label='Avg Entropy')
+            ax_metrics_twin.set_ylabel('Average Entropy', color='orange')
+            ax_metrics_twin.tick_params(axis='y', labelcolor='orange')
+            
+            ax_metrics.set_title('Confidence & Entropy')
+            ax_metrics.grid(True, alpha=0.3)
+            
+            # Combined legend
+            lines = line1 + line2
+            labels = [l.get_label() for l in lines]
+            ax_metrics.legend(lines, labels, loc='best')
+            
+            # Add text info
+            info_text = f"Iteration: {it+1}/{max_iter}\n"
+            info_text += f"Delta: {delta:.6f}\n"
+            info_text += f"Avg Confidence: {avg_confidence:.4f}\n"
+            info_text += f"Avg Entropy: {avg_entropy:.4f}\n"
+            info_text += f"Manual Labels: {len(human_labels)}"
+            
+            fig.text(0.02, 0.98, info_text, transform=fig.transFigure, 
+                    fontsize=10, verticalalignment='top',
+                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+            
+            # Save frame
+            frame_path = frames_folder / f"frame_{it:04d}.png"
+            plt.savefig(frame_path, dpi=100, bbox_inches='tight')
+            plt.close(fig)
+            
+            if (it + 1) % 10 == 0 or it == 0:
+                print(f"  Frame {it+1}/{max_iter} saved (delta={delta:.6f}, conf={avg_confidence:.4f})")
+        
+        # Check convergence
+        if delta < tol:
+            print(f"  Converged at iteration {it+1}")
+            # Save final frame if we haven't already
+            if not save_frame:
+                frame_path = frames_folder / f"frame_{it:04d}_final.png"
+                # ... (same plotting code as above)
+            break
+    
+    print(f"\n{len(list(frames_folder.glob('*.png')))} frames saved to {frames_folder}")
+    
+    return F, frames_folder, convergence_history, confidence_history, entropy_history
 
+def create_animation_video(frames_folder, output_folder_path, run_id, fps=2):
+    """
+    Create an MP4 video from saved frames using matplotlib animation.
+    
+    Parameters:
+    -----------
+    frames_folder : Path
+        Folder containing frame images
+    output_folder_path : Path
+        Output directory for video
+    run_id : str
+        Run identifier
+    fps : int
+        Frames per second for the animation
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.animation as animation
+    from matplotlib import image as mpimg
+    from pathlib import Path
+    import numpy as np
+    
+    # Get all frame files sorted by name
+    frame_files = sorted(frames_folder.glob("frame_*.png"))
+    
+    if not frame_files:
+        print("No frames found to create animation!")
+        return
+    
+    print(f"\nCreating animation from {len(frame_files)} frames at {fps} FPS...")
+    
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(20, 10))
+    ax.axis('off')
+    
+    # Load first frame
+    first_frame = mpimg.imread(frame_files[0])
+    im = ax.imshow(first_frame)
+    
+    def update_frame(frame_num):
+        """Update function for animation"""
+        img = mpimg.imread(frame_files[frame_num])
+        im.set_array(img)
+        return [im]
+    
+    # Create animation
+    anim = animation.FuncAnimation(fig, update_frame, frames=len(frame_files),
+                                  interval=1000/fps, blit=True, repeat=True)
+    
+    # Save as MP4
+    output_path = output_folder_path / f"{run_id}_propagation_animation.mp4"
+    
+    try:
+        # Try to save as MP4 (requires ffmpeg)
+        Writer = animation.writers['ffmpeg']
+        writer = Writer(fps=fps, bitrate=1800)
+        anim.save(output_path, writer=writer)
+        print(f"Animation saved to: {output_path}")
+    except Exception as e:
+        print(f"Could not save as MP4: {e}")
+        print("Trying to save as GIF instead...")
+        
+        # Fallback to GIF
+        output_path_gif = output_folder_path / f"{run_id}_propagation_animation.gif"
+        anim.save(output_path_gif, writer='pillow', fps=fps)
+        print(f"Animation saved as GIF to: {output_path_gif}")
+    
+    plt.close(fig)
 
 LP_METHOD_NAME = "LP1"
 DATASET_NAME = "TestAO-Irma"
@@ -375,55 +697,33 @@ print(f"  Speaker IDs: {speaker_ids}")
 print(f"  Weak prior strength: {weak_prior_strength}")
 print(f"  Min confidence threshold: {min_confidence_threshold}")
 
-# Propagated distributions start from Y
-F = Y.copy()
-
 # --- Step 4: Modified iterative propagation with different anchor strengths ---
 manual_anchor_strength = 0.2  # Strong anchoring for manual labels (1 - alpha for manual)
 weak_anchor_strength = 0.05   # Weak anchoring for HDBSCAN priors
 
-for it in range(max_iter):
-    F_new = alpha * W.dot(F)  # Smoothing term
-    
-    # Add strong anchoring for manually labeled samples
-    for idx, spk in human_labels.items():
-        speaker_idx = id_to_idx[spk]
-        F_new[idx] = (1 - manual_anchor_strength) * F_new[idx]
-        F_new[idx, speaker_idx] += manual_anchor_strength
-    
-    # Add weak anchoring for HDBSCAN priors
-    for i in range(n_samples):
-        if i in human_labels:
-            continue
-            
-        hdb_cluster = merged_sample_labels[i]
-        hdb_confidence = merged_sample_probs[i]
-        
-        if (hdb_cluster != -1 and 
-            hdb_cluster in cluster_to_speaker and 
-            hdb_confidence >= min_confidence_threshold):
-            
-            speaker = cluster_to_speaker[hdb_cluster]
-            speaker_idx = id_to_idx[speaker]
-            
-            # Apply weak anchoring
-            anchor_weight = weak_anchor_strength * hdb_confidence
-            F_new[i] = (1 - anchor_weight) * F_new[i]
-            F_new[i, speaker_idx] += anchor_weight
-    
-    # Normalize rows to maintain probability distributions
-    row_sums = F_new.sum(axis=1, keepdims=True)
-    row_sums[row_sums == 0] = 1  # Avoid division by zero
-    F_new = F_new / row_sums
-    
-    # Convergence check
-    delta = np.abs(F_new - F).sum()
-    F = F_new
-    if delta < tol:
-        print(f"Converged at iteration {it}")
-        break
-else:
-    print(f"Reached maximum iterations ({max_iter})")
+# Replace the existing propagation loop with animation creation:
+F, frames_folder, conv_history, conf_history, ent_history = create_propagation_animation(
+    merged_tsne_2d=merged_tsne_2d,
+    human_labels=human_labels,
+    merged_sample_labels=merged_sample_labels,
+    merged_sample_probs=merged_sample_probs,
+    cluster_to_speaker=cluster_to_speaker,
+    id_to_idx=id_to_idx,
+    W=W,
+    Y=Y,
+    alpha=alpha,
+    max_iter=max_iter,
+    tol=tol,
+    output_folder_path=output_folder_path,
+    run_id=run_id,
+    manual_anchor_strength=manual_anchor_strength,
+    weak_anchor_strength=weak_anchor_strength,
+    min_confidence_threshold=min_confidence_threshold,
+    speaker_ids=speaker_ids
+)
+
+# Create the animation video
+create_animation_video(frames_folder, output_folder_path, run_id, fps=5)
 
 
 # --- Step 5: Assign final labels ---
