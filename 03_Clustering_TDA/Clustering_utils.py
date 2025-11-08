@@ -139,7 +139,7 @@ def plot_clustering(X, labels, probabilities=None, parameters=None,
                     ground_truth=False, ax=None,
                     remove_outliers = False,
                     spkNoise_flag = False,
-                    add_gt_prd_flag = True):
+                    pre_title = None):
 
     if ax is None:
         _, ax = plt.subplots(figsize=(10, 4))
@@ -176,14 +176,21 @@ def plot_clustering(X, labels, probabilities=None, parameters=None,
                 alpha=alpha_value
             )
     n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+
+    if pre_title is None:
+        if ground_truth:
+            pre_title = "GT"
+        else:
+            pre_title = "Prd"
+
     if ground_truth:
         if n_clusters_ == 1:
             title = f"Unlabeled total samples: {len(labels)}"
         else:
-            title = f"GT #n: {n_clusters_} T: {len(labels)}"
+            title = f"{pre_title} #n: {n_clusters_} T: {len(labels)}"
     else:
         non_outliers_percentage = (len(labels[labels != -1]) / len(labels)) * 100
-        title = f"Prd #n: {n_clusters_} | Mem %: {non_outliers_percentage:.2f}%"
+        title = f"{pre_title} #n: {n_clusters_} | Mem %: {non_outliers_percentage:.2f}%"
 
     if parameters is not None:
         parameters_str = ", ".join(f"{k}={v}" for k, v in parameters.items())
@@ -230,7 +237,7 @@ def plot_clustering(X, labels, probabilities=None, parameters=None,
 def plot_clustering_dual(x_tsne_2d, Mixed_y_labels,
                          samples_label, samples_prob,
                          run_id, output_folder_path,
-                         plot_mode):
+                         plot_mode, ground_truth=True):
 
     ## Available options: 
     ## 'show' : only plot
@@ -238,13 +245,13 @@ def plot_clustering_dual(x_tsne_2d, Mixed_y_labels,
     ## 'show_store' : plot and store fig
 
     combined_fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-    plot_clustering(x_tsne_2d, labels=Mixed_y_labels, ground_truth=True,
-                    spkNoise_flag = True,
+    plot_clustering(x_tsne_2d, labels=Mixed_y_labels, ground_truth=ground_truth,
+                    spkNoise_flag=True,
                     ax=axes[0])
 
     plot_clustering(x_tsne_2d, labels=samples_label,
-                     probabilities = samples_prob,
-                    remove_outliers = True, ax=axes[1])
+                    probabilities=samples_prob,
+                    remove_outliers=True, ax=axes[1])
 
     current_fig_path = output_folder_path.joinpath(f'{run_id}.png') 
 
@@ -267,14 +274,14 @@ def plot_clustering_dual(x_tsne_2d, Mixed_y_labels,
         print('Plotting extra figure without speaker noise (label 88)')
         combined_fig, axes = plt.subplots(1, 2, figsize=(12, 6))
         plot_clustering(x_tsne_2d, labels=Mixed_y_labels, ground_truth=True,
-                        spkNoise_flag = False,
+                        spkNoise_flag=False,
                         ax=axes[0])
 
         plot_clustering(x_tsne_2d, labels=samples_label,
-                        probabilities = samples_prob,
-                        remove_outliers = True, ax=axes[1])
+                        probabilities=samples_prob,
+                        remove_outliers=True, ax=axes[1])
 
-        current_fig_path = output_folder_path.joinpath(f'{run_id}_GTlabels.png') 
+        current_fig_path = output_folder_path.joinpath(f'{run_id}_all.png') 
 
         combined_fig.suptitle(f'{run_id}', fontsize=14)
         plt.tight_layout()

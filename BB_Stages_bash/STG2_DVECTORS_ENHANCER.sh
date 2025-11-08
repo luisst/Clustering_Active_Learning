@@ -43,7 +43,10 @@ fi
 echo -e "\t>>>>> Stg2b D Vectors Inference $STG2_FEATS_PICKLE"
 if [ "$SKIP_FEATS" != "true" ] && [ "$MOVE_ON" = "true" ]; then
     python3 ${SRC_PATH}/02_Feature_extraction/Stg2b_inference_dvectors.py --wavs_folder $STG1_FILTERED_CHUNKS_WAVS\
-    --input_mfcc_folder $STG2_MFCC_FILES  --output_feats_pickle $STG2_FEATS_PICKLE --use_pkl_label $USE_PKL_LABEL\
+    --input_mfcc_folder $STG2_MFCC_FILES \
+    --output_feats_pickle $STG2_FEATS_PICKLE\
+    --pretrained_model_path $PRETRAINED_DVECTOR_PATH \
+    --use_pkl_label $USE_PKL_LABEL\
 
     # Check if the Python script was successful
     if [ $? -ne 0 ]; then

@@ -40,6 +40,8 @@ export STG1_VAD_PRETRAINED="${VAD_LOCATION}/en_sfc_model_epoch-6.pt"
 export STG2_ENH_PRETRAINED="${SRC_PATH}/pre-trained/model_S1_256_hard_betaNO4_mask00_lr-5_ep180_73.pth"
 # export STG2_ENH_PRETRAINED="${SRC_PATH}/pre-trained/model_S1_easyN1_mask00_lr-5_ep180_73.pth"
 
+export PRETRAINED_DVECTOR_PATH="${SRC_PATH}/pre-trained/checkpoint_100_original_5994.pth"
+
 ## Segmentation Parameters
 export seg_ln="1.0"
 export step_size="0.2"
@@ -72,9 +74,11 @@ export ENHANCE_RUN_ID="skipped"
 
 #### Stage 3 Unsupervised Method
 export current_stg3="${ROOT_PATH}/${DATASET_NAME}/STG_3/STG3_${EXP_NAME}-${VAD_NAME}-${FEAT_NAME}-${METHOD_NAME}"
+export STG3_CLUSTERING_H5="${current_stg3}/clustering_dataset.h5"
+export STG3_MERGED_H5="${current_stg3}/merged_dataset.h5"
 export STG3_MERGED_WAVS="${current_stg3}/merged_wavs"
-export STG3_AL_INPUT="${current_stg3}/AL_input_merged.csv"
-export STG3_FINAL_CSV="${current_stg3}/pred_output_${EXP_NAME}"
+export STG3_AL_FOLDER="${current_stg3}/active_learning"
+export STG3_AL_INPUT="${STG3_AL_FOLDER}/active_learning_samples.csv"
 
 export pca_elem="0"
 
@@ -84,22 +88,23 @@ export min_samples="5"
 
 export RUN_PARAMS="pca${pca_elem}_mcs${min_cluster_size}_ms${min_samples}_${hdb_mode}"
 
-cd $SRC_PATH
-if [ "$MOVE_ON" = "true" ]; then
-source ./BB_Stages_bash/STG3_META_HDB.sh
-fi
+# cd $SRC_PATH
+# if [ "$MOVE_ON" = "true" ]; then
+# source ./BB_Stages_bash/STG3A_META_HDB.sh
+# fi
 
 
 #### Stage 4 LP
 export LP_METHOD_NAME="LP1"
 export current_stg4="${ROOT_PATH}/${DATASET_NAME}/STG_4/STG4_${LP_METHOD_NAME}"
 export STG4_HUMAN="${current_stg4}/webapp_results"
+# export STG3_FINAL_CSV="${current_stg3}/pred_output_${EXP_NAME}"
 
 
-# cd $SRC_PATH
-# if [ "$MOVE_ON" = "true" ]; then
-#     source ./BB_Stages_bash/STG4_LP.sh
-# fi
+cd $SRC_PATH
+if [ "$MOVE_ON" = "true" ]; then
+    source ./BB_Stages_bash/STG4_LP.sh
+fi
 
 ## Add Azure comparison
 

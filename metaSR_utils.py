@@ -19,7 +19,7 @@ from torch.autograd import Variable
 
 from Stg2_models import background_resnet
 from Stg2_models import background_resnet_ext
-# from pipeline_utilities import log_print
+from pipeline_utilities import log_print, valid_path
 
 USE_LOGSCALE = True
 USE_NORM=  True
@@ -38,25 +38,6 @@ SAMPLE_RATE = 16000
 FILTER_BANK = 40
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-def log_print(*args, **kwargs):
-    """Prints to stdout and also logs to log_path."""
-
-    log_path = kwargs.pop('lp', 'default_log.txt')
-    print_to_console = kwargs.pop('print', True)
-
-    message = " ".join(str(a) for a in args)
-    if print_to_console:
-        print(message)
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(message + "\n")
-
-
-def valid_path(path):
-    if os.path.exists(path):
-        return Path(path)
-    else:
-        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
 def round_half_up(number):
     return int(decimal.Decimal(number).quantize(decimal.Decimal('1'), rounding=decimal.ROUND_HALF_UP))
@@ -399,7 +380,7 @@ def extract_MFB_aolme(current_input_path, output_feats_folder):
     with open(curent_output_path, 'wb') as fp:
         pickle.dump(feat_and_label, fp)
     
-    return current_label
+    return current_label, total_features
 
 
 def load_model_predict(pretrained_path, n_classes, use_cuda = True):

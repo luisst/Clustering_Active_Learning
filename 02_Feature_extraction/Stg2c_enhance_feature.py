@@ -4,33 +4,16 @@ import torch
 from pathlib import Path
 from tqdm import tqdm
 import argparse
-import os
 import warnings
+import sys
 
 from Stg2_models import SimpleClassifier
 from Stg2_dataloaders import inference_dataloader
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from pipeline_utilities import log_print, valid_path
+
 warnings.filterwarnings('ignore', category=FutureWarning)
-# from pipeline_utilities import log_print, valid_path
-
-def log_print(*args, **kwargs):
-    """Prints to stdout and also logs to log_path."""
-
-    log_path = kwargs.pop('lp', 'default_log.txt')
-    print_to_console = kwargs.pop('print', True)
-
-    message = " ".join(str(a) for a in args)
-    if print_to_console:
-        print(message)
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(message + "\n")
-
-
-def valid_path(path):
-    if os.path.exists(path):
-        return Path(path)
-    else:
-        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'

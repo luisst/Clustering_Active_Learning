@@ -5,10 +5,11 @@ import os
 import argparse
 import shutil
 import numpy as np
+import h5py
+import soundfile as sf
 
-from clustering_utils import plot_clustering_dual
-from merge_utils import ffmpeg_split_audio, create_folder_if_missing\
-    , active_learning_sample_selection, format_active_learning_results
+from merge_utils import ffmpeg_split_audio, create_folder_if_missing
+
 
 def valid_path(path):
     if os.path.exists(path):
@@ -16,93 +17,436 @@ def valid_path(path):
     else:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
-base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline','TTS4_easy')
-stg3_pred_folders_ex = base_path_ex.joinpath('STG_3','STG3_EXP010-SHAS-DV-hdb','HDBSCAN_pred_output')
-stg3_merged_wavs_ex = base_path_ex.joinpath('STG_3','STG3_EXP010-SHAS-DV-hdb','merged_wavs')
-stg3_separated_wavs_ex = base_path_ex.joinpath('STG_3','STG3_EXP010-SHAS-DV-hdb','separated_merged_wavs')
-stg3_outliers_ex = base_path_ex.joinpath('STG_3','STG3_EXP010-SHAS-DV-hdb','outliers_wavs')
-stg1_long_wavs_ex = base_path_ex.joinpath('input_wavs')
-clusters_data_pickle_ex = stg3_merged_wavs_ex.parent / 'clustering_data.pickle'
 
-feats_pickle_ex = base_path_ex.joinpath('STG_2','STG2_EXP010-SHAS-DV','TTS4_easy_SHAS_DV_featsEN.pickle')
-al_input_csv_ex = stg3_merged_wavs_ex.parent / 'AL_input_merged.csv'
+def generate_merged_unique_id(cluster_label, merged_index, total_merged_samples):
+    """
+    Generate unique merged sample ID in format: M{label}_{index}
+
+    Parameters:
+    -----------
+    cluster_label : int
+        Cluster label assigned to this merged sample
+    merged_index : int
+        Sequential index within this cluster label group
+    total_merged_samples : int
+        Total number of merged samples (for determining padding)
+
+    Returns:
+    --------
+    unique_id : str
+        Unique identifier (e.g., "M0_0001", "M1_0042")
+    """
+    # Determine padding based on total samples
+    if total_merged_samples <= 100:
+        padding = 2
+    elif total_merged_samples <= 1000:
+        padding = 3
+    else:
+        padding = 4  # Handles up to 9999
+
+    # Format: M{label}_{index with padding}
+    unique_id = f"M{cluster_label}_{merged_index:0{padding}d}"
+
+    return unique_id
+
+
+def load_original_hdf5_data(hdf5_path):
+    """
+    Load original clustering HDF5 dataset.
+
+    Returns:
+    --------
+    dict with all original sample data and ID→index mapping
+    """
+    print(f"\nLoading original HDF5 dataset: {hdf5_path}")
+
+    with h5py.File(hdf5_path, 'r') as hf:
+        data = {
+            'unique_ids': [uid.decode() if isinstance(uid, bytes) else uid
+                          for uid in hf['samples']['unique_ids'][:]],
+            'wav_paths': [wp.decode() if isinstance(wp, bytes) else wp
+                         for wp in hf['samples']['wav_paths'][:]],
+            'enhanced_features': hf['samples']['enhanced_features'][:],
+            'gt_labels': hf['samples']['gt_labels'][:],
+            'umap_features': hf['clustering']['umap_features'][:],
+            'tsne_2d': hf['clustering']['tsne_2d'][:],
+            'cluster_labels': hf['clustering']['cluster_labels'][:],
+            'cluster_probs': hf['clustering']['cluster_probs'][:],
+            'outlier_scores': hf['clustering']['outlier_scores'][:],
+        }
+
+        # Load audio if available
+        if 'audio' in hf:
+            data['audio_waveforms'] = [hf['audio']['waveforms'][i][:]
+                                      for i in range(len(data['unique_ids']))]
+            data['sample_rates'] = hf['audio']['sample_rates'][:]
+        else:
+            data['audio_waveforms'] = [None] * len(data['unique_ids'])
+            data['sample_rates'] = [None] * len(data['unique_ids'])
+
+        print(f"✓ Loaded {len(data['unique_ids'])} original samples")
+
+    # Create mapping: wav_path_stem → index
+    data['path_to_index'] = {Path(wp).stem: idx for idx, wp in enumerate(data['wav_paths'])}
+
+    # Create mapping: unique_id → index
+    data['id_to_index'] = {uid: idx for idx, uid in enumerate(data['unique_ids'])}
+
+    return data
+
+
+def create_merged_hdf5_dataset(
+    merged_samples_data,
+    original_hdf5_data,
+    output_path
+):
+    """
+    Create HDF5 dataset for merged samples.
+
+    Parameters:
+    -----------
+    merged_samples_data : list of dict
+        List of merged sample information
+    original_hdf5_data : dict
+        Original HDF5 data for reference
+    output_path : Path
+        Output HDF5 file path
+    """
+    n_merged = len(merged_samples_data)
+
+    print("\n" + "="*80)
+    print("CREATING MERGED SAMPLES HDF5 DATASET")
+    print("="*80)
+    print(f"Number of merged samples: {n_merged}")
+
+    # Prepare data arrays
+    merged_unique_ids = []
+    merged_wav_paths = []
+    merged_cluster_labels = []
+    merged_gt_labels = []
+    merged_cluster_probs = []
+    merged_start_times = []
+    merged_end_times = []
+    merged_durations = []
+    merged_n_constituents = []
+    constituent_ids_list = []
+    constituent_indices_list = []
+    merged_audio_list = []
+    merged_sample_rates = []
+
+    for merged_sample in merged_samples_data:
+        merged_unique_ids.append(merged_sample['merged_unique_id'])
+        merged_wav_paths.append(merged_sample['merged_wav_path'])
+        merged_cluster_labels.append(merged_sample['cluster_label'])
+        merged_gt_labels.append(merged_sample['avg_gt_label'])
+        merged_cluster_probs.append(merged_sample['avg_cluster_prob'])
+        merged_start_times.append(merged_sample['start_time'])
+        merged_end_times.append(merged_sample['end_time'])
+        merged_durations.append(merged_sample['duration'])
+        merged_n_constituents.append(merged_sample['n_constituents'])
+
+        # Constituent IDs and indices
+        constituent_ids_list.append(merged_sample['constituent_ids'])
+        constituent_indices_list.append(merged_sample['constituent_indices'])
+
+        # Audio
+        merged_audio_list.append(merged_sample['merged_audio'])
+        merged_sample_rates.append(merged_sample['sample_rate'])
+
+    # Convert to numpy arrays
+    merged_unique_ids = np.array(merged_unique_ids, dtype='S25')
+    merged_cluster_labels = np.array(merged_cluster_labels, dtype='int32')
+    merged_gt_labels = np.array(merged_gt_labels, dtype='int32')
+    merged_cluster_probs = np.array(merged_cluster_probs, dtype='float32')
+    merged_start_times = np.array(merged_start_times, dtype='float32')
+    merged_end_times = np.array(merged_end_times, dtype='float32')
+    merged_durations = np.array(merged_durations, dtype='float32')
+    merged_n_constituents = np.array(merged_n_constituents, dtype='int32')
+    merged_sample_rates = np.array(merged_sample_rates, dtype='int32')
+
+    print(f"✓ Prepared merged sample data")
+
+    # Create HDF5 file
+    print(f"\nCreating merged HDF5 file: {output_path}")
+
+    with h5py.File(output_path, 'w') as hf:
+        # =====================================================================
+        # MERGED_SAMPLES GROUP - Core merged sample information
+        # =====================================================================
+        merged_group = hf.create_group('merged_samples')
+
+        # Store merged unique IDs
+        merged_group.create_dataset(
+            'merged_unique_ids',
+            data=merged_unique_ids,
+            dtype='S25',
+            compression='gzip',
+            compression_opts=4
+        )
+
+        # Store merged wav paths (variable-length strings)
+        dt = h5py.string_dtype(encoding='utf-8')
+        merged_wav_paths_encoded = np.array([str(p) for p in merged_wav_paths], dtype=object)
+        merged_group.create_dataset(
+            'merged_wav_paths',
+            data=merged_wav_paths_encoded,
+            dtype=dt,
+            compression='gzip',
+            compression_opts=4
+        )
+
+        # Store cluster labels
+        merged_group.create_dataset(
+            'cluster_labels',
+            data=merged_cluster_labels,
+            dtype='int32',
+            compression='gzip',
+            compression_opts=4
+        )
+
+        # Store GT labels (averaged/most frequent)
+        merged_group.create_dataset(
+            'gt_labels',
+            data=merged_gt_labels,
+            dtype='int32',
+            compression='gzip',
+            compression_opts=4
+        )
+
+        # Store cluster probabilities (averaged)
+        merged_group.create_dataset(
+            'cluster_probs',
+            data=merged_cluster_probs,
+            dtype='float32',
+            compression='gzip',
+            compression_opts=4
+        )
+
+        # Store temporal information
+        merged_group.create_dataset(
+            'start_times',
+            data=merged_start_times,
+            dtype='float32',
+            compression='gzip',
+            compression_opts=4
+        )
+
+        merged_group.create_dataset(
+            'end_times',
+            data=merged_end_times,
+            dtype='float32',
+            compression='gzip',
+            compression_opts=4
+        )
+
+        merged_group.create_dataset(
+            'durations',
+            data=merged_durations,
+            dtype='float32',
+            compression='gzip',
+            compression_opts=4
+        )
+
+        # Store constituent information
+        merged_group.create_dataset(
+            'n_constituents',
+            data=merged_n_constituents,
+            dtype='int32',
+            compression='gzip',
+            compression_opts=4
+        )
+
+        # Store constituent IDs as variable-length arrays
+        dt_vlen_str = h5py.string_dtype(encoding='utf-8')
+        constituent_ids_dataset = merged_group.create_dataset(
+            'constituent_ids',
+            (n_merged,),
+            dtype=h5py.vlen_dtype(dt_vlen_str),
+            compression='gzip',
+            compression_opts=4
+        )
+
+        for i, id_list in enumerate(constituent_ids_list):
+            constituent_ids_dataset[i] = np.array(id_list, dtype=object)
+
+        # Store constituent indices as variable-length arrays
+        constituent_indices_dataset = merged_group.create_dataset(
+            'constituent_indices',
+            (n_merged,),
+            dtype=h5py.vlen_dtype(np.dtype('int32')),
+            compression='gzip',
+            compression_opts=4
+        )
+
+        for i, idx_list in enumerate(constituent_indices_list):
+            constituent_indices_dataset[i] = np.array(idx_list, dtype='int32')
+
+        # Add metadata
+        merged_group.attrs['n_merged_samples'] = n_merged
+        merged_group.attrs['creation_date'] = str(np.datetime64('now'))
+        merged_group.attrs['source'] = 'STG3D_MERGE_WAVS'
+        merged_group.attrs['description'] = 'Merged samples with constituent mappings'
+
+        # =====================================================================
+        # MERGED_AUDIO GROUP - Merged audio waveforms
+        # =====================================================================
+        audio_group = hf.create_group('merged_audio')
+
+        # Store audio as variable-length arrays
+        dt_audio = h5py.vlen_dtype(np.dtype('float32'))
+        audio_dataset = audio_group.create_dataset(
+            'waveforms',
+            (n_merged,),
+            dtype=dt_audio,
+            compression='gzip',
+            compression_opts=4
+        )
+
+        for i, audio in enumerate(merged_audio_list):
+            if audio is not None and len(audio) > 0:
+                audio_dataset[i] = audio.astype(np.float32)
+            else:
+                audio_dataset[i] = np.array([], dtype=np.float32)
+
+        # Store sample rates
+        audio_group.create_dataset(
+            'sample_rates',
+            data=merged_sample_rates,
+            compression='gzip',
+            compression_opts=4
+        )
+
+        audio_group.attrs['n_loaded'] = len([a for a in merged_audio_list if a is not None and len(a) > 0])
+        audio_group.attrs['n_failed'] = len([a for a in merged_audio_list if a is None or len(a) == 0])
+
+        print("\n✓ Merged HDF5 Dataset Structure:")
+        print("  /merged_samples/")
+        print("    - merged_unique_ids: Merged sample IDs (M prefix)")
+        print("    - merged_wav_paths: Merged wav file paths")
+        print("    - cluster_labels: HDBSCAN cluster assignments")
+        print("    - gt_labels: Ground truth labels (averaged/most frequent)")
+        print("    - cluster_probs: Cluster probabilities (averaged)")
+        print("    - start_times, end_times, durations: Temporal info")
+        print("    - n_constituents: Number of constituent samples")
+        print("    - constituent_ids: List of constituent sample IDs")
+        print("    - constituent_indices: List of constituent sample indices")
+        print("  /merged_audio/")
+        print("    - waveforms: Merged audio waveform data")
+        print("    - sample_rates: Audio sample rates")
+
+    # Verify file size
+    file_size_mb = output_path.stat().st_size / (1024 * 1024)
+    print(f"\n✓ Merged HDF5 file created successfully")
+    print(f"  File size: {file_size_mb:.2f} MB")
+
+    # Display statistics
+    print("\n" + "="*80)
+    print("MERGED SAMPLE STATISTICS")
+    print("="*80)
+    print(f"Cluster Labels:")
+    for label in sorted(np.unique(merged_cluster_labels)):
+        count = np.sum(merged_cluster_labels == label)
+        if label == -1:
+            print(f"  Noise: {count} merged samples")
+        else:
+            print(f"  Cluster {label}: {count} merged samples")
+
+    print(f"\nConstituent counts:")
+    print(f"  Min: {np.min(merged_n_constituents)}")
+    print(f"  Max: {np.max(merged_n_constituents)}")
+    print(f"  Mean: {np.mean(merged_n_constituents):.2f}")
+    print(f"  Median: {np.median(merged_n_constituents):.0f}")
+
+
+# ============================================================================
+# ARGUMENT PARSING
+# ============================================================================
+base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','Unsupervised_Pipeline','TestAO-Irma')
+stg3_folder_ex = base_path_ex.joinpath('STG_3','STG3_EXP011-SHAS-DV-hdb')
+stg3_pred_folders_ex = stg3_folder_ex.joinpath('HDBSCAN_pred_output')
+stg3_merged_wavs_ex = stg3_folder_ex.joinpath('merged_wavs')
+stg3_separated_wavs_ex = stg3_folder_ex.joinpath('separated_merged_wavs')
+stg3_outliers_ex = stg3_folder_ex.joinpath('outliers_wavs')
+stg1_long_wavs_ex = base_path_ex.joinpath('input_wavs')
+
+clustering_h5_ex = base_path_ex.joinpath('Testset_stage3','clustering_dataset.h5')
+merged_h5_ex = stg3_folder_ex / 'merged_dataset.h5'
 
 seg_ln_ex = '1.0'
 step_size_ex = '0.3'
 gap_size_ex = '0.4'
 consc_th_ex = 1
 
-Exp_name_ex = 'TTS1'
+Exp_name_ex = 'TestAO-Irma'
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--stg1_long_wavs', type=valid_path, default=stg1_long_wavs_ex, help='Input initial WAVs folder path')
-parser.add_argument('--stg3_pred_folders', type=valid_path, default=stg3_pred_folders_ex, help='Input prediction with folders per label')
-parser.add_argument('--stg3_separated_wavs', type=valid_path, default=stg3_separated_wavs_ex, help='Output separated per Long wav folder path')
-parser.add_argument('--stg3_merged_wavs', type=valid_path, default=stg3_merged_wavs_ex, help='Output merged wavs folder path')
-parser.add_argument('--stg3_outliers', type=valid_path, default=stg3_outliers_ex, help='Output outliers wavs folder path')
-parser.add_argument('--data_clusters_pickle', default=clusters_data_pickle_ex, help='Input path for clustering labels')
-parser.add_argument('--input_feats_pickle', default=feats_pickle_ex, help='Path to the folder to store the D-vectors features')
+parser = argparse.ArgumentParser(
+    description='Stage 3d: Merge consecutive audio segments and create merged HDF5 dataset'
+)
+parser.add_argument('--stg1_long_wavs', type=valid_path, default=stg1_long_wavs_ex,
+                   help='Input initial WAVs folder path')
+parser.add_argument('--stg3_pred_folders', type=valid_path, default=stg3_pred_folders_ex,
+                   help='Input prediction with folders per label')
+parser.add_argument('--stg3_separated_wavs', type=valid_path, default=stg3_separated_wavs_ex,
+                   help='Output separated per Long wav folder path')
+parser.add_argument('--stg3_merged_wavs', type=valid_path, default=stg3_merged_wavs_ex,
+                   help='Output merged wavs folder path')
+parser.add_argument('--stg3_outliers', type=valid_path, default=stg3_outliers_ex,
+                   help='Output outliers wavs folder path')
+parser.add_argument('--data_clusters_h5', default=clustering_h5_ex,
+                   help='Input path for original clustering HDF5 dataset')
+parser.add_argument('--merged_dataset_h5', default=merged_h5_ex,
+                   help='Output path for merged samples HDF5 dataset')
 
-parser.add_argument('--ln', type=float, default=seg_ln_ex, help='Stg2 chunks length ihn seconds')
+parser.add_argument('--ln', type=float, default=seg_ln_ex, help='Stg2 chunks length in seconds')
 parser.add_argument('--st', type=float, default=step_size_ex, help='Stg2 chunks step_size in seconds')
-parser.add_argument('--gap', type=float, default=gap_size_ex, help='Stg2 chunks gap in seconds')
+parser.add_argument('--gap', type=float, default=gap_size_ex, help='Stg3 gap threshold in seconds')
 parser.add_argument('--consc_th', type=int, default=consc_th_ex, help='Stg3 consecutive chunks threshold')
-parser.add_argument('--exp_name', default=Exp_name_ex, help='string with the experiment name')
-parser.add_argument('--AL_input_csv', default=al_input_csv_ex, help='Path to the folder to store predictions for Active Learning')
+parser.add_argument('--exp_name', default=Exp_name_ex, help='Experiment name')
+
 args = parser.parse_args()
 
-stg3_pred_folders = args.stg3_pred_folders 
+stg3_pred_folders = args.stg3_pred_folders
 output_merged_audio = args.stg3_merged_wavs
 output_separated_wavs = args.stg3_separated_wavs
 output_wav_folder_outliers = args.stg3_outliers
 original_wav_files = args.stg1_long_wavs
-data_clusters_pickle = Path(args.data_clusters_pickle)
+clustering_h5_path = Path(args.data_clusters_h5)
+merged_h5_path = Path(args.merged_dataset_h5)
 
 chunk_duration = float(args.ln)
-minimum_chunk_duration = chunk_duration - 0.1 # seconds
-step_length = float(args.st) 
-gap_duration = float(args.gap) 
+minimum_chunk_duration = chunk_duration - 0.1
+step_length = float(args.st)
+gap_duration = float(args.gap)
 consecutive_threshold = int(args.consc_th)
-al_input_csv = Path(args.AL_input_csv)
 
 exp_name = args.exp_name
-
-feats_pickle_path = Path(args.input_feats_pickle)
 
 # Create output folders if they don't exist
 create_folder_if_missing(output_merged_audio)
 create_folder_if_missing(output_separated_wavs)
 create_folder_if_missing(output_wav_folder_outliers)
 
-with open(f'{data_clusters_pickle}', "rb") as file:
-    clustering_data = pickle.load(file)
+# ============================================================================
+# LOAD ORIGINAL HDF5 DATA
+# ============================================================================
+original_data = load_original_hdf5_data(clustering_h5_path)
 
-Mixed_X_paths, hdb_data_input, x_tsne_2d, Mixed_y_labels, samples_label, samples_prob, samples_outliers = clustering_data
+# Extract frequently used variables
+path_to_index = original_data['path_to_index']
+id_to_index = original_data['id_to_index']
+unique_ids = original_data['unique_ids']
+cluster_labels = original_data['cluster_labels']
+cluster_probs = original_data['cluster_probs']
+gt_labels = original_data['gt_labels']
+enhanced_features = original_data['enhanced_features']
+umap_features = original_data['umap_features']
 
-with open(f'{feats_pickle_path}', "rb") as file:
-    x_data, x_paths, _ = pickle.load(file)
-
-output_folder_al = al_input_csv.parent
-
-# Convert Mixed_X_paths wav names to a dictionary for faster lookup
-path_to_index = {Path(path).stem: idx for idx, path in enumerate(Mixed_X_paths)}
-
-# Verify the x_paths stems are equal to Mixed_X_paths stems
-x_paths_stems = [Path(path).stem for path in x_paths]
-mixed_x_paths_stems = [Path(path).stem for path in Mixed_X_paths]
-assert set(x_paths_stems) == set(mixed_x_paths_stems), "Mismatch between x_paths and Mixed_X_paths"
-
-# Lists to store data for merged samples
-merged_paths = []
-merged_hdb_data = []
-merged_tsne_2d = []
-merged_x_data = []
-merged_y_labels = []
-merged_sample_labels = []
-merged_sample_probs = []
-merged_sample_outliers = []
-merged_files_mapping = {}
-merged_idx = 0
+# ============================================================================
+# PROCESS MERGED SEGMENTS
+# ============================================================================
+merged_samples_data = []
+merged_idx_global = 0
+label_merged_counters = {}
 
 counts_segments = []
 verbose = True
@@ -110,17 +454,13 @@ verbose = True
 label_subfolders = [f for f in stg3_pred_folders.iterdir() if f.is_dir()]
 
 for current_pred_label_path in label_subfolders:
-    current_predicted_label = current_pred_label_path.name 
-    
+    current_predicted_label = current_pred_label_path.name
+
     print(f'\nProcessing label: {current_predicted_label}')
 
-    ############################### 1) Copying chunk wavs -> separated folders 
-    # List all .wav files in the directory
+    # 1) Copy chunk wavs to separated folders
     all_stg2_wav_files = list(current_pred_label_path.glob('*.wav'))
-
-    # Get the base name of each file, excluding the last substring divided by a dash
     base_names = [('_'.join(Path(f).name.split('_')[:-4])) for f in all_stg2_wav_files]
-
     base_names_list = list(set(base_names))
 
     if verbose:
@@ -132,39 +472,25 @@ for current_pred_label_path in label_subfolders:
         sub_directory = output_separated_wavs.joinpath(current_predicted_label, base_name)
         create_folder_if_missing(sub_directory)
 
-    # Iterate over each .wav file and copy it to the corresponding sub-directory
+    # Copy files to corresponding sub-directory
     for idx, wav_file in enumerate(all_stg2_wav_files):
         dst_folder = output_separated_wavs.joinpath(current_predicted_label, base_names[idx])
         dst_file = dst_folder.joinpath(wav_file.name)
         shutil.copy(str(wav_file), str(dst_file))
 
-
-    ############################### 2) Create DICT successive files (per long audio) 
+    # 2) Create dict of successive files (per long audio)
     for sub_folder in base_names_list:
-        # print(f'\n{current_predicted_label}\tInside subfolder - {sub_folder}')
         current_sub_directory = output_separated_wavs.joinpath(current_predicted_label, sub_folder)
-
-        # List all .wav files in the sub-directory
         sub_wav_files = list(current_sub_directory.glob('*.wav'))
 
-        # Initialize an empty list to store the tuples with file info
         time_file_tuples = []
-
-        # Iterate over each .wav file
         for wav_file in sub_wav_files:
-            # Split the filename by underscores
             segments = wav_file.stem.split('_')
-
-            # Get the timing and probability information
-            # Format: {original_long_wav}_{startTime}_{stopTime}_{prob}.wav
             start_time = segments[-3]
             stop_time = segments[-2]
             prob = segments[-1]
-
-            # Append the tuple to the list
             time_file_tuples.append((start_time, stop_time, prob, wav_file))
 
-        # Sort the time_file_tuples list by start_time
         time_file_tuples.sort(key=lambda x: float(x[0]))
 
         merged_segments = []
@@ -172,12 +498,6 @@ for current_pred_label_path in label_subfolders:
             print(f'\t!!No wav files found in {current_sub_directory}, skipping...')
             continue
 
-        # # For debugging: print the time_file_tuples
-        # if verbose:
-        #     print(f'Time and file tuples for {current_sub_directory}:')
-        #     for t in time_file_tuples:
-        #         print(f'  Start: {t[0]}, Stop: {t[1]}, Prob: {t[2]}, File: {t[3].name}')
-            
         current_start, current_stop, current_prob, first_file = time_file_tuples[0]
         current_start = float(current_start)
         current_stop = float(current_stop)
@@ -203,22 +523,20 @@ for current_pred_label_path in label_subfolders:
             merged_segments.append((current_start, current_stop, current_files))
             counts_segments.append(current_count)
 
-        # # Print the merged segments info
-        # print(f'\n\nMerged segments:')
-        # for i, (start, stop, files) in enumerate(merged_segments):
-        #     print(f'  Segment {i}: {start:.2f}s - {stop:.2f}s ({len(files)} files)')
+        print(f'\n\nMerged segments:')
+        for i, (start, stop, files) in enumerate(merged_segments):
+            print(f'  Segment {i}: {start:.2f}s - {stop:.2f}s ({len(files)} files)')
 
-        ############################### 3) FOR EACH MERGED SEGMENT -> Create merged file and compute averaged metadata
-
+        # 3) For each merged segment, create merged file and compute metadata
         for idx_seg, current_merged_data in enumerate(merged_segments):
             start_time, stop_time, constituent_files = current_merged_data
 
-            # print(f'\tConstitutent files in segment {idx_seg}: {len(constituent_files)}')
-            
+            print(f'\tConstituent files in segment {idx_seg}: {len(constituent_files)}')
+
             if counts_segments[len(counts_segments) - len(merged_segments) + idx_seg] < consecutive_threshold:
                 continue
 
-            # Create the output filename
+            # Create output filename
             output_filename = f"{sub_folder}_{current_predicted_label}_{start_time}_{stop_time}.wav"
 
             if current_predicted_label == '-1':
@@ -227,177 +545,145 @@ for current_pred_label_path in label_subfolders:
                 current_merged_wav_path = output_merged_audio.joinpath(output_filename)
 
             # Extract audio from original long wav file
-            current_original_wav_filename = f'{sub_folder}.wav' 
+            current_original_wav_filename = f'{sub_folder}.wav'
             original_wav_path = original_wav_files.joinpath(current_original_wav_filename)
 
             # Create merged audio file
             ffmpeg_split_audio(original_wav_path,
-                               current_merged_wav_path,
-                               start_time_csv=str(start_time),
-                               stop_time_csv=str(stop_time))
+                             current_merged_wav_path,
+                             start_time_csv=str(start_time),
+                             stop_time_csv=str(stop_time))
 
-            # print(f'\t\tCreated merged wav: {output_filename}')
+            # Load merged audio for HDF5 storage
+            try:
+                merged_audio, sample_rate = sf.read(str(current_merged_wav_path))
+            except Exception as e:
+                print(f"Warning: Could not load merged audio from {current_merged_wav_path}: {e}")
+                merged_audio = None
+                sample_rate = None
 
-            # Store the mapping of merged file to constituent files
-            constituent_filenames = [const_file.name for const_file in constituent_files]
-
-
-            # Compute averaged metadata for this merged sample
+            # Find constituent sample IDs and indices
+            constituent_ids = []
             constituent_indices = []
             constituent_metadata = {
-                'hdb_data': [],
-                'tsne_2d': [],
-                'xdata': [],
-                'y_labels': [],
-                'sample_labels': [],
-                'sample_probs': [],
-                'sample_outliers': []
+                'gt_labels': [],
+                'cluster_labels': [],
+                'cluster_probs': [],
+                'enhanced_features': [],
+                'umap_features': [],
             }
 
-            # Find indices of constituent files in the original clustering data
             for const_file in constituent_files:
-                file_path_str = (const_file.stem).split('_')[:-1]  # Remove the last part (probability)
-                file_path_str = '_'.join(file_path_str)  # Join back to form the
-                # print(f'Looking for {file_path_str} in dict')
+                file_path_str = (const_file.stem).split('_')[:-1]
+                file_path_str = '_'.join(file_path_str)
+
                 if file_path_str in path_to_index:
-                    # print(f'>>>>>> Found file path in clustering data.')
                     idx = path_to_index[file_path_str]
                     constituent_indices.append(idx)
-                    
-                    constituent_metadata['hdb_data'].append(hdb_data_input[idx])
-                    constituent_metadata['tsne_2d'].append(x_tsne_2d[idx])
-                    constituent_metadata['xdata'].append(x_data[idx])
-                    constituent_metadata['y_labels'].append(Mixed_y_labels[idx])
-                    constituent_metadata['sample_labels'].append(samples_label[idx])
-                    constituent_metadata['sample_probs'].append(samples_prob[idx])
-                    constituent_metadata['sample_outliers'].append(samples_outliers[idx])
+                    constituent_ids.append(unique_ids[idx])
 
-
-                    tmp_umap_data = np.array(constituent_metadata['hdb_data'])
-                    # print(f'hdb data shape: {tmp_umap_data.shape}')
+                    constituent_metadata['gt_labels'].append(gt_labels[idx])
+                    constituent_metadata['cluster_labels'].append(cluster_labels[idx])
+                    constituent_metadata['cluster_probs'].append(cluster_probs[idx])
+                    constituent_metadata['enhanced_features'].append(enhanced_features[idx])
+                    constituent_metadata['umap_features'].append(umap_features[idx])
                 else:
-                    print(f'>>>>>> Warning: File path {file_path_str} not found in clustering data.')
-            
-            # print(f'Found {len(constituent_indices)} constituent files in clustering data.')
+                    print(f'Warning: File path {file_path_str} not found in clustering data.')
 
-            most_frequent_y_label = 9999  # Default value in case no labels found
+            if not constituent_indices:
+                print(f'Warning: No constituent files found for merged sample. Skipping.')
+                continue
 
-            if constituent_indices:
+            # Compute averaged/aggregated metadata
+            avg_cluster_prob = float(np.mean(constituent_metadata['cluster_probs']))
 
-                # Compute averages for numerical data
-                avg_hdb_data = np.mean(constituent_metadata['hdb_data'], axis=0)
-                avg_tsne_2d = np.mean(constituent_metadata['tsne_2d'], axis=0)
-                avg_x_data = np.mean(constituent_metadata['xdata'], axis=0)
-                avg_sample_prob = np.mean(constituent_metadata['sample_probs'])
-                avg_sample_outlier = np.mean(constituent_metadata['sample_outliers'])
-                
-                # For categorical data, use the most frequent value or first occurrence
-                # For sample label, use the current predicted label (converted to int if possible)
-                try:
-                    merged_sample_label = int(current_predicted_label)
-                except ValueError:
-                    merged_sample_label = current_predicted_label
-                
-                # For ground truth label, use the most frequent one
-                unique_y_labels, counts = np.unique(constituent_metadata['y_labels'], return_counts=True)
-                most_frequent_y_label = unique_y_labels[np.argmax(counts)]
+            # Most frequent GT label
+            unique_gt_labels, counts = np.unique(constituent_metadata['gt_labels'], return_counts=True)
+            most_frequent_gt_label = int(unique_gt_labels[np.argmax(counts)])
 
-                # Store the merged sample data
-                merged_paths.append(current_merged_wav_path.stem)
-                merged_hdb_data.append(avg_hdb_data)
-                merged_tsne_2d.append(avg_tsne_2d)
-                merged_x_data.append(avg_x_data)
-                merged_y_labels.append(most_frequent_y_label)
-                merged_sample_labels.append(merged_sample_label)
-                merged_sample_probs.append(avg_sample_prob)
-                merged_sample_outliers.append(avg_sample_outlier)
+            # Generate merged unique ID
+            cluster_label_int = int(most_frequent_gt_label)
 
-                # For debugging print all merged sample data
-                if verbose:
-                    print(f'    - merged: {current_merged_wav_path.stem} \t n_files: {len(constituent_files)}')
+            # Initialize counter for this label if not exists
+            if cluster_label_int not in label_merged_counters:
+                label_merged_counters[cluster_label_int] = 0
 
-            merged_files_mapping[output_filename] = {
-                'merged_idx': merged_idx ,
-                'merged_file_path': str(current_merged_wav_path),
-                'original_long_wav': current_original_wav_filename,
+            # Note: We'll determine total_merged_samples after processing all
+            # For now, use a large number (10000) for padding
+            merged_unique_id = generate_merged_unique_id(
+                cluster_label_int,
+                label_merged_counters[cluster_label_int],
+                10000
+            )
+            label_merged_counters[cluster_label_int] += 1
+
+            # Store merged sample data
+            merged_sample_info = {
+                'merged_unique_id': merged_unique_id,
+                'merged_wav_path': output_filename,
+                'cluster_label': current_predicted_label,
+                'avg_gt_label': most_frequent_gt_label,
+                'avg_cluster_prob': avg_cluster_prob,
                 'start_time': float(start_time),
-                'stop_time': float(stop_time),
-                'prob': round(float(avg_sample_prob), 3) if constituent_indices else None,
-                'predicted_label': int(current_predicted_label),
-                'avg_GT_label': int(most_frequent_y_label),
-                'num_constituent_files': len(constituent_files),
-                'constituent_files': constituent_filenames
+                'end_time': float(stop_time),
+                'duration': float(stop_time - start_time),
+                'n_constituents': len(constituent_ids),
+                'constituent_ids': constituent_ids,
+                'constituent_indices': constituent_indices,
+                'merged_audio': merged_audio,
+                'sample_rate': sample_rate if sample_rate is not None else 0,
             }
-            merged_idx += 1
 
+            merged_samples_data.append(merged_sample_info)
+
+            if verbose:
+                print(f'    - merged: {merged_unique_id} \t n_constituents: {len(constituent_ids)}')
 
 print(f'\n\n*** Summary ***')
-print(f'Total merged samples created: {len(merged_paths)}')
 print(f'Stats of concatenated files: {len(counts_segments)} segments processed')
+print(f'Total merged samples created: {len(merged_samples_data)}')
 
-# Convert lists to numpy arrays
-merged_hdb_data = np.array(merged_hdb_data)
-merged_tsne_2d = np.array(merged_tsne_2d)
-merged_x_data = np.array(merged_x_data)
-merged_y_labels = np.array(merged_y_labels)
-merged_sample_labels = np.array(merged_sample_labels)
-merged_sample_probs = np.array(merged_sample_probs)
-merged_sample_outliers = np.array(merged_sample_outliers)
+# ============================================================================
+# CREATE MERGED HDF5 DATASET
+# ============================================================================
+if merged_samples_data:
+    create_merged_hdf5_dataset(
+        merged_samples_data,
+        original_data,
+        merged_h5_path
+    )
+else:
+    print("Warning: No merged samples were created. Skipping HDF5 creation.")
 
-# Plot sample chunks and merged samples comparison
-
-current_run_id = f'{exp_name}_merged_samples'
-plot_clustering_dual(x_tsne_2d, merged_y_labels,
-                        merged_sample_labels, merged_sample_probs,
-                        current_run_id, output_merged_audio.parent,
-                        'store')
-
-# Create the merged clustering data
-merged_clustering_data = [
-    merged_x_data,
-    merged_paths, 
-    merged_hdb_data, 
-    merged_tsne_2d, 
-    merged_y_labels, 
-    merged_sample_labels, 
-    merged_sample_probs, 
-    merged_sample_outliers
-]
-
-print(f'Shape of merged_hdb_data: {merged_hdb_data.shape}')
-print(f'Shape of merged_x_data: {merged_x_data.shape}')
-
-# Save the merged clustering data
-merged_data_pickle_path = output_merged_audio.parent / 'merged_clustering_data.pickle'
-with open(str(merged_data_pickle_path), 'wb') as file:
-    pickle.dump(merged_clustering_data, file)
-
-print(f'Saved merged clustering data to: {merged_data_pickle_path}')
-
-# Save counts segments for compatibility
+# ============================================================================
+# SAVE LEGACY FILES FOR COMPATIBILITY
+# ============================================================================
+# Save counts segments
 counts_pickle_path = output_merged_audio.parent / 'counts_segments.pickle'
 with open(str(counts_pickle_path), 'wb') as file:
     pickle.dump(counts_segments, file)
+print(f'\nSaved segment counts to: {counts_pickle_path}')
 
-print(f'Saved segment counts to: {counts_pickle_path}')
-# Save the merged files mapping to JSON
+# Save merged files mapping to JSON (for backward compatibility)
+merged_files_mapping = {}
+for merged_sample in merged_samples_data:
+    merged_files_mapping[merged_sample['merged_wav_path']] = {
+        'merged_unique_id': merged_sample['merged_unique_id'],
+        'cluster_label': merged_sample['cluster_label'],
+        'avg_gt_label': merged_sample['avg_gt_label'],
+        'avg_cluster_prob': merged_sample['avg_cluster_prob'],
+        'start_time': merged_sample['start_time'],
+        'end_time': merged_sample['end_time'],
+        'n_constituents': merged_sample['n_constituents'],
+        'constituent_ids': merged_sample['constituent_ids'],
+    }
+
 merged_mapping_json_path = output_merged_audio.parent / 'merged_files_mapping.json'
 with open(str(merged_mapping_json_path), 'w', encoding='utf-8') as json_file:
     json.dump(merged_files_mapping, json_file, indent=2, ensure_ascii=False)
 
 print(f'Saved merged files mapping to: {merged_mapping_json_path}')
 print(f'Total mappings saved: {len(merged_files_mapping)}')
-print('Merging process completed successfully!')
-
-# Active Learning Sample Selection
-selected_samples, selection_reasons = active_learning_sample_selection(
-    merged_sample_labels, merged_sample_probs, merged_hdb_data, output_folder_al, n_samples_per_cluster=3, plot_flag=True
-)
-
-# Format and save results for manual labeling
-active_learning_df = format_active_learning_results(
-    selected_samples, selection_reasons, merged_paths, merged_y_labels, merged_sample_probs, 
-    al_input_csv, exp_name
-)
-
-
+print('\n' + "="*80)
+print('MERGING PROCESS COMPLETED SUCCESSFULLY!')
+print("="*80)

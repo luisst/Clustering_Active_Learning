@@ -1,30 +1,24 @@
 from __future__ import print_function
-import os
 import warnings
 from pathlib import Path
 import warnings
 import pickle
 import argparse
+import sys
 
-warnings.filterwarnings('ignore', category=FutureWarning)
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from metaSR_utils import d_vectors_pretrained_model
+from pipeline_utilities import valid_path
 
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
+warnings.filterwarnings('ignore', category=FutureWarning)
 
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = '0' 
 
 min_cluster_size = 0
 pca_elem = 0
 hdb_mode = None
 min_samples = 0
-
-def valid_path(path):
-    if os.path.exists(path):
-        return Path(path)
-    else:
-        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
 root_ex = Path('/home/luis/Dropbox/DATASETS_AUDIO')
 wavs_folder_ex = root_ex / Path('Dvectors/TTS4_easy_40-200/input_wavs')

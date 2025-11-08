@@ -109,21 +109,27 @@ def ffmpeg_split_audio(input_video, output_pth,
     return start_time_csv, stop_time_csv
 
 
-def active_learning_sample_selection(hdb_labels, hdb_probs, umap_data, output_folder_al, n_samples_per_cluster=3, plot_flag=False):
+def active_learning_sample_selection(hdb_labels, hdb_probs, umap_data, output_folder_al, x_tsne_2d, n_samples_per_cluster=3, plot_flag=False):
     """
     Select samples for manual labeling using Active Learning strategies.
-    
+
     Parameters:
     -----------
     hdb_labels : array
         HDBSCAN cluster labels
-    hdb_probs : array  
+    hdb_probs : array
         HDBSCAN membership probabilities
     umap_data : array
-        UMAP-reduced data for visualization
+        UMAP-reduced data for distance calculations
+    output_folder_al : Path
+        Output folder for saving plots
+    x_tsne_2d : array
+        t-SNE 2D coordinates for visualization (ensures consistency with other plots)
     n_samples_per_cluster : int
         Number of samples to select per cluster (max 3)
-        
+    plot_flag : bool
+        Whether to generate and save plots
+
     Returns:
     --------
     dict : Dictionary mapping cluster_id to list of selected sample indices
@@ -244,24 +250,35 @@ def active_learning_sample_selection(hdb_labels, hdb_probs, umap_data, output_fo
               f"from {len(cluster_indices)} total ({reasons_for_cluster})")
         
     if plot_flag:
-        # Plot UMAP with selected samples highlighted
-        plt.figure(figsize=(10, 8))
-        plt.scatter(umap_data[:, 0], umap_data[:, 1], c='lightgray', s=20, label='All samples')
-        
-        colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta']
+        # Plot t-SNE 2D with selected samples highlighted (for visual consistency)
+        plt.figure(figsize=(12, 10))
+
+        # Plot all samples in light gray
+        plt.scatter(x_tsne_2d[:, 0], x_tsne_2d[:, 1], c='lightgray', s=30, alpha=0.5, label='All samples', edgecolors='none')
+
+        # Color palette for different clusters
+        colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta',
+                  'lime', 'pink', 'olive', 'navy', 'teal', 'maroon', 'gold']
         color_map = {cid: colors[i % len(colors)] for i, cid in enumerate(unique_clusters)}
-        
+
+        # Plot selected samples per cluster with larger markers
         for cluster_id, sample_indices in selected_samples.items():
-            cluster_umap = umap_data[sample_indices]
-            plt.scatter(cluster_umap[:, 0], cluster_umap[:, 1], 
-                        c=color_map[cluster_id], s=25, label=f'Cluster {cluster_id}')
-        
-        plt.title('UMAP Projection with Selected Active Learning Samples')
-        plt.xlabel('UMAP 1')
-        plt.ylabel('UMAP 2')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig(output_folder_al / 'umap_active_learning_selected_samples.png')
+            cluster_tsne = x_tsne_2d[sample_indices]
+            plt.scatter(cluster_tsne[:, 0], cluster_tsne[:, 1],
+                        c=color_map[cluster_id], s=150, marker='o',
+                        label=f'Cluster {cluster_id} (n={len(sample_indices)})',
+                        edgecolors='none', linewidths=1.5, zorder=5)
+
+        plt.title('t-SNE 2D Projection with Selected Active Learning Samples', fontsize=14, fontweight='bold')
+        plt.xlabel('t-SNE Dimension 1', fontsize=12)
+        plt.ylabel('t-SNE Dimension 2', fontsize=12)
+        plt.legend(loc='best', fontsize=10, framealpha=0.9)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(output_folder_al / 'tsne_active_learning_selected_samples.png', dpi=150)
+        plt.close()
+
+        print(f"  Plot saved: {output_folder_al / 'tsne_active_learning_selected_samples.png'}")
     
     return selected_samples, selection_reasons
 

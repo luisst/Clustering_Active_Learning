@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 import warnings
-import pickle
+import h5py
 from sklearn.exceptions import UndefinedMetricWarning
 
 import os
@@ -64,38 +64,105 @@ def valid_path(path):
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
 
-base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','VAD_aolme','TestAO-Irmadb')
-feats_pickle_ex = base_path_ex.joinpath('Testset_stage3','HDBSCAN_pred_output','features.pkl')
-feats_reduced_pickle_ex = base_path_ex.joinpath('Testset_stage3','HDBSCAN_pred_output','features_reduced.pkl')
+def load_data_from_hdf5(hdf5_path):
+    """
+    Load clustering data from HDF5 dataset for metrics calculation.
 
-stg3_pred_lbl_pickle_ex = base_path_ex.joinpath('Testset_stage3','HDBSCAN_pred_output','stg3_final_csv')
+    Args:
+        hdf5_path: Path to HDF5 file
+
+    Returns:
+        dict: Dictionary with keys:
+            - enhanced_features: Original D-vector features (n_samples, n_features)
+            - umap_features: UMAP reduced features (n_samples, n_components)
+            - cluster_labels: HDBSCAN cluster assignments (n_samples,)
+            - cluster_probs: HDBSCAN probabilities (n_samples,)
+            - gt_labels: Ground truth labels (n_samples,)
+    """
+    print(f"\nLoading HDF5 dataset: {hdf5_path}")
+
+    with h5py.File(hdf5_path, 'r') as hf:
+        # Load only the data needed for metrics calculation
+        data = {
+            'enhanced_features': hf['samples']['enhanced_features'][:],
+            'gt_labels': hf['samples']['gt_labels'][:],
+            'umap_features': hf['clustering']['umap_features'][:],
+            'cluster_labels': hf['clustering']['cluster_labels'][:],
+            'cluster_probs': hf['clustering']['cluster_probs'][:],
+        }
+
+        # Display quick summary
+        n_samples = hf['samples'].attrs['n_samples']
+        n_clusters = hf['clustering'].attrs['n_clusters']
+        n_noise = hf['clustering'].attrs['n_noise']
+
+        print(f"✓ Loaded {n_samples} samples")
+        print(f"  - {n_clusters} clusters, {n_noise} noise points")
+        print(f"  - Enhanced features: {data['enhanced_features'].shape}")
+        print(f"  - UMAP features: {data['umap_features'].shape}")
+
+    return data
+
+
+base_path_ex = Path.home().joinpath('Dropbox','DATASETS_AUDIO','VAD_aolme','TestAO-Irmadb')
+clusters_f5_ex = base_path_ex.joinpath('Testset_stage3','clustering_dataset.h5')
+
 clustering_metric_output_folder_ex = base_path_ex.joinpath('Testset_stage3','HDBSCAN_pred_output','metrics')
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--input_feats_pickle', default=feats_pickle_ex, help='Path to the folder to store the D-vectors features')
-parser.add_argument('--input_feats_reduced_pickle', default=feats_reduced_pickle_ex, help='Stg3 predicted labels from clustering')
-parser.add_argument('--stg3_pred_lbl', type=valid_path, default=stg3_pred_lbl_pickle_ex, help='Stg3 predicted labels from clustering')
-parser.add_argument('--stg3_clustering_metrics', type=valid_path, default=clustering_metric_output_folder_ex, help='Path to the folder to store the clustering metrics')
+parser = argparse.ArgumentParser(
+    description='Stage 3c: Calculate Internal Clustering Metrics from HDF5 Dataset'
+)
+parser.add_argument(
+    '--data_clusters_h5',
+    default=clusters_f5_ex,
+    help='Path to the HDF5 clustering dataset file'
+)
+parser.add_argument(
+    '--stg3_clustering_metrics',
+    type=valid_path,
+    default=clustering_metric_output_folder_ex,
+    help='Path to the folder to store the clustering metrics'
+)
 args = parser.parse_args()
 
-feats_pickle_path = args.input_feats_pickle
-labels_pred_path = args.stg3_pred_lbl
+dataset_h5_path = Path(args.data_clusters_h5)
 stg3_clustering_metrics = args.stg3_clustering_metrics
-feats_reduced_pickle_path = args.input_feats_reduced_pickle
 
-with open(f'{feats_pickle_path}', "rb") as file:
-    X_data_and_labels = pickle.load(file)
-Mixed_X_data, Mixed_X_paths, Mixed_y_labels = X_data_and_labels
+# ============================================================================
+# LOAD DATA FROM HDF5 DATASET
+# ============================================================================
+# This replaces the old pickle loading approach
+# Instead of loading multiple pickle files, we now load everything from
+# a single organized HDF5 file
 
-with open(f'{labels_pred_path}', "rb") as file:
-    pred_labels = pickle.load(file)
+data = load_data_from_hdf5(dataset_h5_path)
 
-with open(f'{feats_reduced_pickle_path}', "rb") as file:
-    reduced_feats = pickle.load(file)
+# Extract the arrays we need for metrics calculation
+# These correspond to the old variables:
+# - Mixed_X_data -> enhanced_features (original D-vectors)
+# - reduced_feats -> umap_features (UMAP reduced features)
+# - pred_labels -> cluster_labels (HDBSCAN predictions)
 
-### Metrics calculation
-metrics = calculate_internal_metrics(Mixed_X_data, pred_labels)
+enhanced_features = data['enhanced_features']  # Original D-vectors
+umap_features = data['umap_features']          # UMAP reduced features (for HDBSCAN)
+cluster_labels = data['cluster_labels']        # HDBSCAN cluster predictions
+
+print("\n" + "="*80)
+print("DATA READY FOR METRICS CALCULATION")
+print("="*80)
+print(f"Enhanced features shape: {enhanced_features.shape}")
+print(f"UMAP features shape: {umap_features.shape}")
+print(f"Cluster labels shape: {cluster_labels.shape}")
+print(f"Number of clusters: {len(np.unique(cluster_labels[cluster_labels >= 0]))}")
+print(f"Number of noise points: {np.sum(cluster_labels == -1)}")
+print("="*80 + "\n")
+
+# ============================================================================
+# METRICS CALCULATION - Original Features (D-vectors)
+# ============================================================================
+print("Calculating metrics on original D-vector features...")
+metrics = calculate_internal_metrics(enhanced_features, cluster_labels)
 import matplotlib.pyplot as plt
 
 # Create a bar plot to visualize the metrics
@@ -158,8 +225,11 @@ if metrics['calinski_harabasz_score'] is not None:
 else:
     print("Calinski-Harabasz Index: Not calculated")
 
-### Metrics calculation for reduced features
-metrics_reduced = calculate_internal_metrics(reduced_feats, pred_labels)
+# ============================================================================
+# METRICS CALCULATION - Reduced Features (UMAP)
+# ============================================================================
+print("Calculating metrics on UMAP reduced features...")
+metrics_reduced = calculate_internal_metrics(umap_features, cluster_labels)
 
 # Create a bar plot to visualize the metrics for reduced features
 metric_values_reduced = [
@@ -207,3 +277,11 @@ if metrics_reduced['calinski_harabasz_score'] is not None:
     print(f"Calinski-Harabasz Index: {metrics_reduced['calinski_harabasz_score']:.4f} (higher is better)")
 else:
     print("Calinski-Harabasz Index: Not calculated")
+
+print("\n" + "="*80)
+print("METRICS CALCULATION COMPLETED")
+print("="*80)
+print(f"✓ Metrics plots saved to: {stg3_clustering_metrics}")
+print("  - clustering_metrics_plot.png (D-vector features)")
+print("  - clustering_metrics_plot_reduced.png (UMAP features)")
+print("="*80)

@@ -1,19 +1,19 @@
 import os
 from pathlib import Path
-from metaSR_utils import extract_MFB_aolme
 import sys
 import argparse
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from metaSR_utils import extract_MFB_aolme
 
 root_dir = Path.home().joinpath('Dropbox','DATASETS_AUDIO')
-input_wavs_folder_ex = root_dir / 'Dvectors/TTS4_easy_40-200/input_wavs' 
-output_feats_folder_ex = root_dir / 'Dvectors/TTS4_easy_40-200/input_feats'
+input_wavs_folder_ex = root_dir / 'Dvectors/TestAO-Irma/STG_1/STG1_SHAS/wav_chunks_filtered' 
+output_feats_folder_ex = root_dir / 'Dvectors/TestAO-Irma/STG_2/STG2_EXP010-SHAS-DV/MFCC_files2'
 
 if not output_feats_folder_ex.exists():
     os.makedirs(output_feats_folder_ex)
 
 parser = argparse.ArgumentParser()
-
 parser.add_argument('--wavs_folder', default=input_wavs_folder_ex , help='Path to the folder containing the WAV files')
 parser.add_argument('--output_feats_folder', default=output_feats_folder_ex, help='Path to the folder to save the extracted features')
 args = parser.parse_args()
@@ -32,7 +32,7 @@ if len(list_of_wavs) == 0:
 count = 0
 list_of_labels = []
 for current_wav_path in list_of_wavs:
-    current_GT_label = extract_MFB_aolme(current_wav_path, output_feats_folder)
+    current_GT_label, _ = extract_MFB_aolme(current_wav_path, output_feats_folder)
     list_of_labels.append(current_GT_label)
     count = count + 1
     print(f'{count} - feature extraction: {current_wav_path.name}')

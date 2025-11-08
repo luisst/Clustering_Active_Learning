@@ -9,19 +9,7 @@ import pickle
 from torch.utils.data import Dataset, DataLoader
 
 from sklearn.model_selection import train_test_split
-# from pipeline_utilities import log_print
-
-def log_print(*args, **kwargs):
-    """Prints to stdout and also logs to log_path."""
-
-    log_path = kwargs.pop('lp', 'default_log.txt')
-    print_to_console = kwargs.pop('print', True)
-
-    message = " ".join(str(a) for a in args)
-    if print_to_console:
-        print(message)
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(message + "\n")
+from pipeline_utilities import log_print
 
 class metaGenerator(object):
 
