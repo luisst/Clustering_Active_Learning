@@ -80,7 +80,7 @@ def load_h5_with_labels(h5_path):
         data = {
             'merged_unique_ids': [uid.decode() if isinstance(uid, bytes) else uid
                                  for uid in hf['merged_samples']['merged_unique_ids'][:]],
-            'cluster_labels': hf['merged_samples']['cluster_labels'][:],
+            'merged_cluster_labels_avgd': hf['merged_samples']['cluster_labels'][:],
             'cluster_probs': hf['merged_samples']['cluster_probs'][:],
             'gt_labels': hf['merged_samples']['gt_labels'][:],
         }
@@ -251,6 +251,8 @@ def run_label_propagation(W, Y, human_labels, cluster_labels, cluster_probs,
             speaker_to_color = {spk: palette[i] for i, spk in enumerate(speaker_ids)}
 
     for it in range(max_iter):
+
+        # Store previous state for convergence calculation
         F_prev = F.copy()
 
         # Propagation step
@@ -482,8 +484,7 @@ if len(human_labels) == 0:
 A, sigma = build_knn_graph(X_data, K_NN, METRIC)
 
 # Add MST
-if ADD_MST:
-    A = add_mst_edges(A, X_data, sigma, metric='euclidean')
+A = add_mst_edges(A, X_data, sigma, metric='euclidean')
 
 # Normalize adjacency matrix
 W = normalize(A.tocsr(), norm='l1', axis=1)
@@ -506,7 +507,7 @@ for idx, spk in human_labels.items():
     if hdb_cluster != -1:
         if hdb_cluster in cluster_to_speaker:
             if cluster_to_speaker[hdb_cluster] != spk:
-                print(f"  Warning: Cluster {hdb_cluster} has conflicting labels")
+                print(f" >>> Warning: Cluster {hdb_cluster} has conflicting labels")
         cluster_to_speaker[hdb_cluster] = spk
 
 print(f"  Cluster-to-speaker mapping: {cluster_to_speaker}")
@@ -527,6 +528,10 @@ for i in range(n_samples):
     hdb_cluster = cluster_labels[i]
     hdb_confidence = cluster_probs[i]
 
+    # Only add weak prior if:
+    # 1. Not noise (-1)
+    # 2. Cluster is mapped to a speaker
+    # 3. HDBSCAN confidence is above threshold
     if (hdb_cluster != -1 and
         hdb_cluster in cluster_to_speaker and
         hdb_confidence >= MIN_CONFIDENCE_THRESHOLD):
@@ -534,9 +539,11 @@ for i in range(n_samples):
         speaker = cluster_to_speaker[hdb_cluster]
         speaker_idx = id_to_idx[speaker]
 
+        # Set weak prior proportional to HDBSCAN confidence
         prior_strength = WEAK_PRIOR_STRENGTH * hdb_confidence
         Y[i, speaker_idx] = prior_strength
 
+        # Distribute remaining probability uniformly among other classes
         remaining_prob = 1.0 - prior_strength
         uniform_prob = remaining_prob / (n_classes - 1)
         for j in range(n_classes):
@@ -566,6 +573,39 @@ F, metrics = run_label_propagation(
 y_pred_idx = np.argmax(F, axis=1)
 y_pred = np.array([idx_to_id[i] for i in y_pred_idx])
 confidence_scores = np.max(F, axis=1)
+
+# Map numeric GT labels to speaker names using human labels
+print(f"\n{'='*80}")
+print("MAPPING GROUND TRUTH LABELS TO SPEAKER NAMES")
+print("="*80)
+
+# Build mapping from numeric GT labels to speaker names
+gt_label_to_speaker = {}
+for sample_idx, speaker in human_labels.items():
+    numeric_gt = gt_labels[sample_idx]
+    if numeric_gt not in gt_label_to_speaker:
+        gt_label_to_speaker[numeric_gt] = speaker
+    elif gt_label_to_speaker[numeric_gt] != speaker:
+        print(f"  Warning: GT label {numeric_gt} has conflicting speaker assignments")
+
+print(f"  GT label to speaker mapping: {gt_label_to_speaker}")
+
+# Create mapped GT labels (convert numeric to speaker names)
+gt_labels_mapped = []
+unmapped_gt_labels = set()
+for numeric_gt in gt_labels:
+    if numeric_gt in gt_label_to_speaker:
+        gt_labels_mapped.append(gt_label_to_speaker[numeric_gt])
+    else:
+        # Unknown GT label - use placeholder
+        gt_labels_mapped.append('UNKNOWN')
+        unmapped_gt_labels.add(numeric_gt)
+
+gt_labels_mapped = np.array(gt_labels_mapped)
+
+if unmapped_gt_labels:
+    print(f"  Warning: {len(unmapped_gt_labels)} GT labels could not be mapped: {sorted(unmapped_gt_labels)}")
+    print(f"  These samples will be labeled as 'UNKNOWN'")
 
 print(f"\n{'='*80}")
 print("PROPAGATION RESULTS")
@@ -602,13 +642,13 @@ print("="*80)
 
 fig, axes = plt.subplots(1, 3, figsize=(24, 8))
 
-# Plot 1: Ground Truth labels
+# Plot 1: Ground Truth labels (mapped to speaker names)
 ax = axes[0]
-gt_counts = Counter(gt_labels)
-unique_gt = np.unique(gt_labels)
+gt_counts = Counter(gt_labels_mapped)
+unique_gt = np.unique(gt_labels_mapped)
 palette_gt = sns.color_palette('tab10', n_colors=len(unique_gt))
 gt_to_color = {label: palette_gt[i] for i, label in enumerate(unique_gt)}
-colors_gt = [gt_to_color[label] for label in gt_labels]
+colors_gt = [gt_to_color[label] for label in gt_labels_mapped]
 ax.scatter(tsne_2d[:, 0], tsne_2d[:, 1], c=colors_gt, s=50, alpha=0.7)
 handles = [mlines.Line2D([], [], color=gt_to_color[label], marker='o', linestyle='None',
                          markersize=8, label=f"{label} (n={gt_counts[label]})")
@@ -677,15 +717,15 @@ print(f"\n{'='*80}")
 print("CALCULATING ACCURACY METRICS")
 print("="*80)
 
-gt_accuracy = accuracy_score(gt_labels, y_pred)
+gt_accuracy = accuracy_score(gt_labels_mapped, y_pred)
 print(f"  Overall accuracy vs GT: {gt_accuracy*100:.2f}%")
 
 # Classification report
-unique_labels_all = np.unique(np.concatenate([gt_labels, y_pred]))
+unique_labels_all = np.unique(np.concatenate([gt_labels_mapped, y_pred]))
 print(f"  Unique labels: {sorted(unique_labels_all)}")
 
 try:
-    class_report = classification_report(gt_labels, y_pred, labels=unique_labels_all, zero_division=0)
+    class_report = classification_report(gt_labels_mapped, y_pred, labels=unique_labels_all, zero_division=0)
     print(f"  Classification Report:\n{class_report}")
 except Exception as e:
     print(f"  Could not generate classification report: {e}")
@@ -693,7 +733,7 @@ except Exception as e:
 
 # Confusion matrix
 try:
-    conf_matrix = confusion_matrix(gt_labels, y_pred, labels=unique_labels_all)
+    conf_matrix = confusion_matrix(gt_labels_mapped, y_pred, labels=unique_labels_all)
     print(f"  Confusion Matrix:")
     print(f"  GT\\Pred: {unique_labels_all}")
     for i, gt_label in enumerate(unique_labels_all):
@@ -704,10 +744,10 @@ except Exception as e:
 
 # Per-class accuracy
 class_accuracies = {}
-for label in np.unique(gt_labels):
-    mask = gt_labels == label
+for label in np.unique(gt_labels_mapped):
+    mask = gt_labels_mapped == label
     if np.sum(mask) > 0:
-        class_acc = accuracy_score(gt_labels[mask], y_pred[mask])
+        class_acc = accuracy_score(gt_labels_mapped[mask], y_pred[mask])
         class_accuracies[label] = class_acc
         print(f"  Class '{label}' accuracy: {class_acc*100:.2f}% ({np.sum(mask)} samples)")
 
@@ -755,12 +795,13 @@ with open(log_path, 'w', encoding='utf-8') as f:
     f.write(f"GROUND TRUTH COMPARISON\n")
     f.write(f"{'='*80}\n")
     f.write(f"  Overall accuracy vs GT: {gt_accuracy*100:.2f}%\n")
-    f.write(f"  Unique GT labels: {sorted(np.unique(gt_labels).tolist())}\n")
+    f.write(f"  Unique GT labels: {sorted(np.unique(gt_labels_mapped).tolist())}\n")
     f.write(f"  Unique predicted labels: {sorted(np.unique(y_pred).tolist())}\n")
+    f.write(f"  GT label mapping: {gt_label_to_speaker}\n")
 
     f.write(f"\n  Per-class accuracy:\n")
     for label, acc in class_accuracies.items():
-        gt_count = np.sum(gt_labels == label)
+        gt_count = np.sum(gt_labels_mapped == label)
         f.write(f"    Class '{label}': {acc*100:.2f}% ({gt_count} samples)\n")
 
     f.write(f"\n  Classification Report:\n")
@@ -790,13 +831,14 @@ with open(log_path, 'w', encoding='utf-8') as f:
     f.write(f"DETAILED PREDICTIONS\n")
     f.write(f"{'='*80}\n")
     for idx, unique_id in enumerate(unique_ids):
-        gt = gt_labels[idx]
+        gt_numeric = gt_labels[idx]
+        gt_mapped = gt_labels_mapped[idx]
         hdb = cluster_labels[idx]
         hdbp = cluster_probs[idx]
         lp = y_pred[idx]
         lpc = confidence_scores[idx]
         human = 'YES' if idx in human_labels else 'NO'
-        f.write(f"{unique_id}: GT={gt}, HDBSCAN=C{hdb} (p={hdbp:.2f}), LP={lp} (conf={lpc:.2f}), Manual={human}\n")
+        f.write(f"{unique_id}: GT={gt_mapped} ({gt_numeric}), HDBSCAN=C{hdb} (p={hdbp:.2f}), LP={lp} (conf={lpc:.2f}), Manual={human}\n")
 
 print(f"✓ Log saved to: {log_path}")
 

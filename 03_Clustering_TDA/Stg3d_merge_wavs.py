@@ -197,7 +197,7 @@ def create_merged_hdf5_dataset(
 
         # Store cluster labels
         merged_group.create_dataset(
-            'cluster_labels',
+            'merged_cluster_labels_avgd',
             data=merged_cluster_labels,
             dtype='int32',
             compression='gzip',
@@ -215,7 +215,7 @@ def create_merged_hdf5_dataset(
 
         # Store cluster probabilities (averaged)
         merged_group.create_dataset(
-            'cluster_probs',
+            'merged_cluster_probs_avgd',
             data=merged_cluster_probs,
             dtype='float32',
             compression='gzip',

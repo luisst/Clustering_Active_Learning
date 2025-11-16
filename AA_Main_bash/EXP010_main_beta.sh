@@ -58,6 +58,11 @@ export current_stg1="${ROOT_PATH}/${DATASET_NAME}/STG_1/STG1_${VAD_NAME}"
 export STG1_WAVS="${ROOT_PATH}/${DATASET_NAME}/input_wavs/"
 export STG1_FILTERED_CHUNKS_WAVS="${current_stg1}/wav_chunks_filtered"
 
+# Stage 1f: Speaker JSON variables
+export STG1_SPEAKERS_DATABASE_JSON="${SRC_PATH}/04_Active_learning_loop/images_june4.json"
+export STG1_SPEAKERS_JSON="${STG1_WAVS}/speakers_info.json"
+export SPEAKERS_JSON_FILENAME="speakers_by_basename.json"
+
 # source ./BB_Stages_bash/STG1_SHAS.sh
 
 #### Stage 2 Feature Extraction
@@ -79,6 +84,7 @@ export STG3_MERGED_H5="${current_stg3}/merged_dataset.h5"
 export STG3_MERGED_WAVS="${current_stg3}/merged_wavs"
 export STG3_AL_FOLDER="${current_stg3}/active_learning"
 export STG3_AL_INPUT="${STG3_AL_FOLDER}/active_learning_samples.csv"
+export STG3_PREDICTIONS_CSV="${current_stg3}/merged_predictions.csv"
 
 export pca_elem="0"
 
@@ -88,17 +94,17 @@ export min_samples="5"
 
 export RUN_PARAMS="pca${pca_elem}_mcs${min_cluster_size}_ms${min_samples}_${hdb_mode}"
 
-# cd $SRC_PATH
-# if [ "$MOVE_ON" = "true" ]; then
-# source ./BB_Stages_bash/STG3A_META_HDB.sh
-# fi
+cd $SRC_PATH
+if [ "$MOVE_ON" = "true" ]; then
+source ./BB_Stages_bash/STG3A_META_HDB.sh
+fi
 
 
 #### Stage 4 LP
 export LP_METHOD_NAME="LP1"
 export current_stg4="${ROOT_PATH}/${DATASET_NAME}/STG_4/STG4_${LP_METHOD_NAME}"
 export STG4_HUMAN="${current_stg4}/webapp_results"
-# export STG3_FINAL_CSV="${current_stg3}/pred_output_${EXP_NAME}"
+export STG4_LP_RESULTS_CSV="${current_stg4}/lp_results/RUN001_lp_results.csv"
 
 
 cd $SRC_PATH
@@ -106,7 +112,17 @@ if [ "$MOVE_ON" = "true" ]; then
     source ./BB_Stages_bash/STG4_LP.sh
 fi
 
-## Add Azure comparison
+#### Stage 5 Metrics Comparison
+
+export STG5_AZURE_FOLDER="${ROOT_PATH}/${DATASET_NAME}/azure_diarization_output"
+export current_stg5="${ROOT_PATH}/${DATASET_NAME}/STG_5"
+export STG5_LP_RESULTS="${current_stg5}/LP_metrics"
+export STG5_AZURE_RESULTS="${current_stg5}/Azure_metrics"
+
+# cd $SRC_PATH
+# if [ "$MOVE_ON" = "true" ]; then
+#     source ./BB_Stages_bash/STG5_METRICS.sh
+# fi
 
 #### GetBack to where you once belonged
 
@@ -114,45 +130,61 @@ fi
 conda activate
 cd $SRC_PATH
 
-# # Unset all the variables
-# unset ROOT_PATH
-# unset SRC_PATH
-# unset EXP_NAME
-# unset DATASET_NAME
-# unset SHAS_NAME
-# unset FEAT_NAME
-# unset METHOD_NAME
-# unset STG1_WAVS
-# unset STG1_FINAL_CSV
-# unset current_stg2
-# unset STG2_FEATS_PICKLE
-# unset current_stg3
-# unset STG3_MERGED_WAVS
-# unset min_cluster_size
-# unset pca_elem
-# unset hdb_mode
-# unset min_samples
-# unset RUN_ID
-# unset RUN_PARAMS
-
-# unset SHAS_LOCATION
-# unset path_to_yaml_folder
-# unset path_to_yaml_file
-# unset SHAS_ROOT
-# unset path_to_checkpoint
-# unset STG1_WAVS
-# unset STG1_FINAL_CSV
-# unset SRC_PATH
-
-# unset HDBSCAN_LOCATION
-# unset STG2_CHUNKS_WAVS
-# unset STG2_MFCC_FILES
-# unset SRC_PATH
-# unset STG2_FEATS_PICKLE
-
-# unset HDBSCAN_LOCATION
-# unset STG3_HDBSCAN_PRED_OUTPUT
-# unset STG3_SEPARATED_WAVS
-# unset STG3_OUTLIERS_WAVS
-# unset STG4_FINAL_CSV
-# unset STG4_SEPARATED_MERGED_WAVS
+# Unset all the variables
+unset MOVE_ON
+unset ROOT_PATH
+unset SRC_PATH
+unset EXP_NAME
+unset DATASET_NAME
+unset VAD_NAME
+unset FEAT_NAME
+unset METHOD_NAME
+unset AZURE_FLAG
+unset DOUBLE_TALK_FLAG
+unset SILENT_DET_FLAG
+unset ENHANCE_FLAG
+unset GT_CSV_FOLDER
+unset PREDICT_ONLY
+unset USE_PKL_LABEL
+unset VAD_LOCATION
+unset STG1_DT_PRETRAINED
+unset STG1_VAD_PRETRAINED
+unset STG2_ENH_PRETRAINED
+unset PRETRAINED_DVECTOR_PATH
+unset seg_ln
+unset step_size
+unset gap_size
+unset consc_th
+unset min_overlap_percentage
+unset DT_THRESHOLD
+unset STG1_MP4_FOLDER
+unset current_stg1
+unset STG1_WAVS
+unset STG1_FILTERED_CHUNKS_WAVS
+unset STG1_SPEAKERS_DATABASE_JSON
+unset STG1_SPEAKERS_JSON
+unset SPEAKERS_JSON_FILENAME
+unset current_stg2
+unset STG2_FEATS_PICKLE
+unset STG2_FEATS_ENHANCED
+unset ENHANCE_RUN_ID
+unset current_stg3
+unset STG3_CLUSTERING_H5
+unset STG3_MERGED_H5
+unset STG3_MERGED_WAVS
+unset STG3_AL_FOLDER
+unset STG3_AL_INPUT
+unset STG3_PREDICTIONS_CSV
+unset pca_elem
+unset min_cluster_size
+unset hdb_mode
+unset min_samples
+unset RUN_PARAMS
+unset LP_METHOD_NAME
+unset current_stg4
+unset STG4_HUMAN
+unset STG4_LP_RESULTS_CSV
+unset STG5_AZURE_FOLDER
+unset current_stg5
+unset STG5_LP_RESULTS
+unset STG5_AZURE_RESULTS

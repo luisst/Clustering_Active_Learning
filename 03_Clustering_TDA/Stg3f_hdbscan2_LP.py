@@ -70,10 +70,10 @@ def load_merged_hdf5_data(merged_h5_path):
                                  for uid in hf['merged_samples']['merged_unique_ids'][:]],
             'merged_wav_paths': [wp.decode() if isinstance(wp, bytes) else wp
                                 for wp in hf['merged_samples']['merged_wav_paths'][:]],
-            'cluster_labels': hf['merged_samples']['cluster_labels'][:],
+            'merged_cluster_labels_avgd': hf['merged_samples']['merged_cluster_labels_avgd'][:],
             'gt_labels': hf['merged_samples']['gt_labels'][:],
             'n_constituents': hf['merged_samples']['n_constituents'][:],
-            'cluster_probs': hf['merged_samples']['cluster_probs'][:],
+            'merged_cluster_probs_avgd': hf['merged_samples']['merged_cluster_probs_avgd'][:],
         }
 
         # Load recalculated D-vector features
@@ -84,6 +84,31 @@ def load_merged_hdf5_data(merged_h5_path):
             raise ValueError("Recalculated features not found in HDF5. Run Stage 3e first.")
 
         print(f"✓ Loaded {len(data['merged_unique_ids'])} merged samples")
+        print(f"  - Cluster distribution: {dict(zip(*np.unique(data['merged_cluster_labels_avgd'], return_counts=True)))}")
+
+    return data
+
+
+def load_original_clustering_data(clustering_h5_path):
+    """
+    Load original Stage 3A clustering data (t-SNE, labels, probs) for chunk-level samples.
+
+    Returns:
+    --------
+    dict with original clustering data: tsne_2d, labels, probs
+    """
+    print(f"\nLoading original Stage 3A clustering data: {clustering_h5_path}")
+
+    with h5py.File(clustering_h5_path, 'r') as hf:
+        data = {
+            'tsne_2d': hf['clustering']['tsne_2d'][:],
+            'cluster_labels': hf['clustering']['cluster_labels'][:],
+            'cluster_probs': hf['clustering']['cluster_probs'][:]
+        }
+
+        print(f"✓ Loaded Stage 3A clustering data")
+        print(f"  - t-SNE 2D shape: {data['tsne_2d'].shape}")
+        print(f"  - Cluster labels: {len(data['cluster_labels'])} samples")
         print(f"  - Cluster distribution: {dict(zip(*np.unique(data['cluster_labels'], return_counts=True)))}")
 
     return data
@@ -189,6 +214,7 @@ def update_merged_hdf5_with_clustering(
 base_path_ex = Path.home().joinpath('Dropbox', 'DATASETS_AUDIO', 'Unsupervised_Pipeline', 'TestAO-Irma')
 stg3_folder_ex = base_path_ex.joinpath('STG_3', 'STG3_EXP011-SHAS-DV-hdb')
 merged_h5_ex = stg3_folder_ex / 'merged_dataset.h5'
+clustering_h5_ex = stg3_folder_ex / 'clustering_dataset.h5'
 
 stg3_al_folder_ex = stg3_folder_ex / 'active_learning'
 al_input_csv_ex = stg3_al_folder_ex / 'active_learning_samples.csv'
@@ -205,6 +231,11 @@ parser.add_argument(
     '--merged_dataset_h5',
     default=merged_h5_ex,
     help='Input path for merged samples HDF5 dataset (with recalculated features)'
+)
+parser.add_argument(
+    '--clustering_dataset_h5',
+    default=clustering_h5_ex,
+    help='Input path for Stage 3A clustering HDF5 dataset (contains original chunk-level t-SNE and labels)'
 )
 parser.add_argument(
     '--output_folder_al',
@@ -242,6 +273,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 merged_h5_path = Path(args.merged_dataset_h5)
+clustering_h5_path = Path(args.clustering_dataset_h5)
 output_folder_al = args.output_folder_al
 al_input_csv = Path(args.al_input_csv)
 exp_name = args.exp_name
@@ -253,6 +285,9 @@ n_umap_components = args.n_umap_components
 if not merged_h5_path.exists():
     sys.exit(f"Error: Merged HDF5 file not found: {merged_h5_path}")
 
+if not clustering_h5_path.exists():
+    sys.exit(f"Error: Clustering HDF5 file not found: {clustering_h5_path}")
+
 # ============================================================================
 # MAIN WORKFLOW
 # ============================================================================
@@ -263,13 +298,19 @@ print("=" * 80)
 # Step 1: Load merged HDF5 data (including recalculated features)
 merged_data = load_merged_hdf5_data(merged_h5_path)
 
+# Step 1b: Load original Stage 3A clustering data (chunk-level t-SNE and labels)
+stg3a_data = load_original_clustering_data(clustering_h5_path)
+x_tsne_2d_Stg3A = stg3a_data['tsne_2d']
+labels_Stg3A = stg3a_data['cluster_labels']
+probs_Stg3A = stg3a_data['cluster_probs']
+
 # Extract data
 merged_dvectors = merged_data['dvectors']
 merged_unique_ids = merged_data['merged_unique_ids']
 merged_wav_paths = merged_data['merged_wav_paths']
 merged_gt_labels = merged_data['gt_labels']
-merged_cluster_labels_original = merged_data['cluster_labels']  # Original HDBSCAN labels from Stage 3A
-merged_cluster_probs_original = merged_data['cluster_probs']  # Original probabilities
+merged_cluster_labels_avgd = merged_data['merged_cluster_labels_avgd']  # Original HDBSCAN labels from Stage 3A
+merged_cluster_probs_avgd = merged_data['merged_cluster_probs_avgd']  # Original probabilities
 n_merged = len(merged_unique_ids)
 
 print(f"\n{'='*80}")
@@ -403,9 +444,9 @@ update_merged_hdf5_with_clustering(
     merged_h5_path,
     best_umap_features,
     x_tsne_2d,
-    samples_label,
-    samples_prob,
-    samples_outliers
+    merged_samples_label,
+    merged_samples_prob,
+    merged_samples_outliers
 )
 
 # Step 8: Active Learning Sample Selection
@@ -414,8 +455,8 @@ print(f"ACTIVE LEARNING SAMPLE SELECTION")
 print(f"{'='*80}")
 
 selected_samples, selection_reasons = active_learning_sample_selection(
-    samples_label,
-    samples_prob,
+    merged_samples_label,
+    merged_samples_prob,
     best_umap_features,
     output_folder_al,
     x_tsne_2d,
@@ -439,7 +480,7 @@ for cluster_id, sample_indices in selected_samples.items():
             'merged_unique_id': merged_unique_ids[idx],
             'wav_path': merged_wav_paths[idx],
             'selection_reason': reason,
-            'hdbscan_prob': samples_prob[idx],
+            'hdbscan_prob': merged_samples_prob[idx],
             'gt_label': merged_gt_labels[idx],
             'suggested_label': f'Speaker_C{cluster_id}'  # Placeholder for manual labeling
         })

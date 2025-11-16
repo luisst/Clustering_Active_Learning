@@ -29,7 +29,7 @@ def load_merged_hdf5_data(merged_h5_path):
                                  for uid in hf['merged_samples']['merged_unique_ids'][:]],
             'merged_wav_paths': [wp.decode() if isinstance(wp, bytes) else wp
                                 for wp in hf['merged_samples']['merged_wav_paths'][:]],
-            'cluster_labels': hf['merged_samples']['cluster_labels'][:],
+            'merged_cluster_labels': hf['merged_samples']['merged_cluster_labels_avgd'][:],
             'gt_labels': hf['merged_samples']['gt_labels'][:],
             'n_constituents': hf['merged_samples']['n_constituents'][:],
             'audio_waveforms': [hf['merged_audio']['waveforms'][i][:]
@@ -38,7 +38,7 @@ def load_merged_hdf5_data(merged_h5_path):
         }
 
         print(f"✓ Loaded {len(data['merged_unique_ids'])} merged samples")
-        print(f"  - Cluster distribution: {dict(zip(*np.unique(data['cluster_labels'], return_counts=True)))}")
+        print(f"  - Cluster distribution: {dict(zip(*np.unique(data['merged_cluster_labels'], return_counts=True)))}")
 
     return data
 

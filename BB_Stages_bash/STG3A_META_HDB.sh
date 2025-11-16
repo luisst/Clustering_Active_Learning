@@ -43,6 +43,20 @@ python3 ${SRC_PATH}/folder_verify.py $STG3_MERGED_OUTLIERS_WAVS
 python3 ${SRC_PATH}/folder_verify.py $STG3_SEPARATED_MERGED_WAVS
 python3 ${SRC_PATH}/folder_verify.py $STG3_ACTIVE_LEARNING
 
+# ## Validate speaker JSON consistency across dataset folders
+# echo -e "\n\t>>>>> Validating Speaker JSON Consistency\n"
+# python3 ${SRC_PATH}/03_Clustering_TDA/validate_speaker_json.py \
+#     --dataset_root "${ROOT_PATH}/${DATASET_NAME}"
+
+# # Check if validation was successful
+# if [ $? -ne 0 ]; then
+#     echo -e "\n\t ✗ ERROR: Speaker JSON validation failed"
+#     echo -e "\tPlease ensure speakers_by_basename.json files are consistent"
+#     echo -e "\tYou may need to regenerate them using extract_speakers_from_json.py\n"
+#     export MOVE_ON=false
+#     return 1
+# fi
+
 conda activate metaSR3
 
 echo -e "prediction outputs will be saved in: $STG3_HDBSCAN_PRED_OUTPUT"
@@ -127,6 +141,7 @@ if [ "$SKIP_STG3f" != "true" ]; then
 
     python3 ${SRC_PATH}/03_Clustering_TDA/Stg3f_hdbscan2_LP.py \
     --merged_dataset_h5 $STG3_MERGED_H5 \
+    --clustering_dataset_h5 $STG3_CLUSTERING_H5 \
     --output_folder_al $current_stg3 \
     --al_input_csv $STG3_AL_INPUT \
     --exp_name ${EXP_NAME}_merged \
@@ -143,4 +158,38 @@ if [ "$SKIP_STG3f" != "true" ]; then
 else
     echo -e "\n\t>>>>> Stage 3f: HDBSCAN Clustering on Merged Samples skipped\n"
 fi
+
+## Export merged predictions to CSV
+echo -e "\n\t>>>>> Stage 3g: Export Merged Predictions to CSV\n"
+echo -e "  - Merged HDF5: $STG3_MERGED_H5"
+echo -e "  - Output CSV: $STG3_PREDICTIONS_CSV\n"
+
+python3 ${SRC_PATH}/03_Clustering_TDA/Stg3g_export_merged_predictions.py \
+    --merged_dataset_h5 $STG3_MERGED_H5 \
+    --output_csv $STG3_PREDICTIONS_CSV
+
+# Check if the Python script was successful
+if [ $? -ne 0 ]; then
+    export MOVE_ON=false
+    echo "Move on: $MOVE_ON"
+    return 1
+else
+    echo -e "\n\t ✓ Stage 3g completed successfully"
+    echo -e "\tPredictions CSV: $STG3_PREDICTIONS_CSV"
+fi
+
+# Unset all stage 3 variables
+unset SKIP_STG3A
+unset SKIP_metrics
+unset SKIP_merged
+unset SKIP_STG3e
+unset SKIP_STG3f
+unset STG3_HDBSCAN_PRED_OUTPUT
+unset STG3_CLUSTERING_METRICS
+unset STG3_SEPARATED_WAVS
+unset STG3_OUTLIERS_WAVS
+unset STG3_MERGED_OUTLIERS_WAVS
+unset STG3_SEPARATED_MERGED_WAVS
+unset STG3_ACTIVE_LEARNING
+unset RUN_ID
 

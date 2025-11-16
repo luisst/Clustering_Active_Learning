@@ -460,7 +460,64 @@ def d_vector_dict_lbls(list_of_feats, model,
     return label_dict
 
 
-def convert_dict_to_tensor(dict_data_input):
+def load_speakers_info_json(speakers_json_path):
+    """
+    Load speakers info from JSON file and create speaker number mapping
+
+    Args:
+        speakers_json_path: Path to speakers_info.json or speakers_by_basename.json
+
+    Returns:
+        Dictionary mapping speaker_name to speaker_number (as int)
+        Returns None if file doesn't exist or can't be parsed
+    """
+    import json
+
+    if speakers_json_path is None or not Path(speakers_json_path).exists():
+        return None
+
+    try:
+        with open(speakers_json_path, 'r', encoding='utf-8') as f:
+            speakers_data = json.load(f)
+
+        # Extract speaker mappings from all base names
+        speaker_name_to_number = {}
+        for base_name, data in speakers_data.items():
+            speakers = data.get('speakers', [])
+            for speaker in speakers:
+                speaker_name = speaker['speaker_name']
+                speaker_number = int(speaker['speaker_number'])
+
+                # Check for conflicts
+                if speaker_name in speaker_name_to_number:
+                    if speaker_name_to_number[speaker_name] != speaker_number:
+                        print(f"  ⚠ Warning: Speaker '{speaker_name}' has conflicting numbers: "
+                              f"{speaker_name_to_number[speaker_name]} vs {speaker_number}")
+                else:
+                    speaker_name_to_number[speaker_name] = speaker_number
+
+        print(f"  ✓ Loaded speaker mappings from JSON: {len(speaker_name_to_number)} speakers")
+        for name, num in sorted(speaker_name_to_number.items(), key=lambda x: x[1]):
+            print(f"    - {name}: {num}")
+
+        return speaker_name_to_number
+
+    except Exception as e:
+        print(f"  ✗ Error loading speakers JSON: {e}")
+        return None
+
+
+def convert_dict_to_tensor(dict_data_input, speakers_info_json_path=None):
+    """
+    Convert dictionary of embeddings to tensor format
+
+    Args:
+        dict_data_input: Dictionary with speaker labels as keys and (tensor, path) tuples as values
+        speakers_info_json_path: Optional path to speakers_info.json for speaker number mapping
+
+    Returns:
+        Tuple of (concatenated_tensor, y_data, path_list, speaker_labels_dict)
+    """
     # Initialize lists to store labels and concatenated data
     labels_list = []
     data_list = []
@@ -472,7 +529,7 @@ def convert_dict_to_tensor(dict_data_input):
         if len(tensor_and_path) != 0:
             # Repeat the label for each row in the tensor
             labels = [label] * len(tensor_and_path)
-            
+
             # Append labels and data to the respective lists
             labels_list.extend(labels)
             for current_tuple in tensor_and_path:
@@ -480,18 +537,47 @@ def convert_dict_to_tensor(dict_data_input):
                 # data_list.append()
                 path_list.append(str(current_tuple[1]))
 
-    # # Concatenate the tensors in data_list along the first dimension (rows)
-    # if len(data_list) != 0:
-    #     X_data = torch.cat(data_list, dim=0)
-    # else:
-    #     X_data = torch.empty(0)
+    # Load speaker info from JSON if provided
+    speaker_name_to_number = load_speakers_info_json(speakers_info_json_path)
 
-    speaker_labels_dict = dict([(y,x) for x,y in enumerate(sorted(set(labels_list)))])
-    if 'noises' in speaker_labels_dict.keys():
-        speaker_labels_dict['noises'] = 99 
-    
-    if 'spkNoise' in speaker_labels_dict.keys():
-        speaker_labels_dict['spkNoise'] = 88 
+    # Create speaker_labels_dict
+    if speaker_name_to_number is not None:
+        # Use mapping from JSON file
+        print(f"  ✓ Using speaker numbers from JSON file")
+        speaker_labels_dict = {}
+
+        # Get all unique speaker names from labels_list
+        unique_speakers = sorted(set(labels_list))
+
+        for speaker_name in unique_speakers:
+            if speaker_name in speaker_name_to_number:
+                # Use number from JSON
+                speaker_labels_dict[speaker_name] = speaker_name_to_number[speaker_name]
+            elif speaker_name == 'noises':
+                # Special code for noises
+                speaker_labels_dict[speaker_name] = 99
+            elif speaker_name == 'spkNoise':
+                # Special code for spkNoise
+                speaker_labels_dict[speaker_name] = 88
+            else:
+                # Speaker not in JSON - assign next available number
+                used_numbers = set(speaker_labels_dict.values())
+                next_num = 1
+                while next_num in used_numbers or next_num in [88, 99]:
+                    next_num += 1
+                speaker_labels_dict[speaker_name] = next_num
+                print(f"  ⚠ Warning: Speaker '{speaker_name}' not in JSON, assigned number: {next_num}")
+    else:
+        # Fallback to original behavior - auto-enumerate
+        print(f"  ℹ No speaker JSON provided, using auto-enumeration")
+        speaker_labels_dict = dict([(y,x) for x,y in enumerate(sorted(set(labels_list)))])
+
+        # Keep special codes
+        if 'noises' in speaker_labels_dict.keys():
+            speaker_labels_dict['noises'] = 99
+
+        if 'spkNoise' in speaker_labels_dict.keys():
+            speaker_labels_dict['spkNoise'] = 88
 
     y_lbls = [speaker_labels_dict[x] for x in labels_list]
     y_data = np.array(y_lbls)
@@ -502,7 +588,8 @@ def convert_dict_to_tensor(dict_data_input):
 
 def separate_dict_embeddings(dict_embeddings, percentage_test,
                              return_paths = False,
-                             verbose = False):
+                             verbose = False,
+                             speakers_info_json_path=None):
     # Calculate the total number of samples across all labels
     total_samples = sum(len(samples) for samples in dict_embeddings.values())
     
@@ -552,8 +639,8 @@ def separate_dict_embeddings(dict_embeddings, percentage_test,
         dict_train_data[label] = train_sampled_data 
 
 
-    X_test, y_test, X_test_path, speaker_labels_dict_test = convert_dict_to_tensor(dict_test_data)
-    X_train, y_train, X_train_path, speaker_labels_dict_train = convert_dict_to_tensor(dict_train_data)
+    X_test, y_test, X_test_path, speaker_labels_dict_test = convert_dict_to_tensor(dict_test_data, speakers_info_json_path)
+    X_train, y_train, X_train_path, speaker_labels_dict_train = convert_dict_to_tensor(dict_train_data, speakers_info_json_path)
 
 
     if return_paths:
@@ -592,7 +679,8 @@ def d_vectors_pretrained_model(feats_folder, percentage_test,
                                return_paths_flag = False,
                                norm_flag = False,
                                use_cuda=True,
-                               use_pkl_label=False , verbose = False):
+                               use_pkl_label=False, verbose = False,
+                               speakers_info_json_path=None):
 
     list_of_feats = sorted(list(feats_folder.glob('*.pkl')))
     list_of_wavs = sorted(list(wavs_paths.glob('*.wav')))
@@ -619,7 +707,8 @@ def d_vectors_pretrained_model(feats_folder, percentage_test,
         for key in list_of_keys:
             file.write(f"{key}: {len(dict_embeddings[key])}\n")
 
-    return separate_dict_embeddings(dict_embeddings, 
+    return separate_dict_embeddings(dict_embeddings,
                                     percentage_test,
                                     return_paths = return_paths_flag,
-                                    verbose = verbose)
+                                    verbose = verbose,
+                                    speakers_info_json_path=speakers_info_json_path)

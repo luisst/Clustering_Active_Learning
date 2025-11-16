@@ -16,7 +16,7 @@ else:
         print(f"Processing: {csv_path.name}")
         
         # --- Load file ---
-        df = pd.read_csv(csv_path, sep='\t')
+        df = pd.read_csv(csv_path, sep='\t', header=0)
         
         # --- Compute new columns ---
         filename = csv_path.stem  # e.g., "experiment_run1_sample"

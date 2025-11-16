@@ -90,85 +90,124 @@ export path_to_yaml_file="${path_to_yaml_folder}/VAD_${EXP_NAME}.yaml"
 # fi
 
 
-echo -e "\n\t>>>>> Stage1c: Divide into chunks $STG1_WAVS \n"
+# echo -e "\n\t>>>>> Stage1c: Divide into chunks $STG1_WAVS \n"
 
-echo "Azure flag is: $AZURE_FLAG"
-echo "Minimum overlap percentage: $min_overlap_percentage"
+# echo "Azure flag is: $AZURE_FLAG"
+# echo "Minimum overlap percentage: $min_overlap_percentage"
 
-if [ "$SKIP_1C" != "true" ] && [ "$MOVE_ON" = "true" ]; then
-    python3 ${SRC_PATH}/01_VAD_chunks/Stage1c_divide_into_chunks.py --stg1_wavs $STG1_WAVS\
-     --stg1_final_csv $STG1_VAD_CSV \
-     --stg1_chunks_wavs $STG1_RAW_CHUNKS_WAVS\
-     --ln $seg_ln --st $step_size --min_overlap_pert $min_overlap_percentage\
-     --GT_folder_path $GT_CSV_FOLDER
-else
-    echo -e "\n\t>>>>> Stage1c: Chunk division skipped\n"
-fi
-# Check if the Python script was successful
-if [ $? -ne 0 ]; then
-    export MOVE_ON=false
-    echo "Move on: $MOVE_ON"
-    return 1
-fi
+# if [ "$SKIP_1C" != "true" ] && [ "$MOVE_ON" = "true" ]; then
+#     python3 ${SRC_PATH}/01_VAD_chunks/Stage1c_divide_into_chunks.py --stg1_wavs $STG1_WAVS\
+#      --stg1_final_csv $STG1_VAD_CSV \
+#      --stg1_chunks_wavs $STG1_RAW_CHUNKS_WAVS\
+#      --ln $seg_ln --st $step_size --min_overlap_pert $min_overlap_percentage\
+#      --GT_folder_path $GT_CSV_FOLDER
+# else
+#     echo -e "\n\t>>>>> Stage1c: Chunk division skipped\n"
+# fi
+# # Check if the Python script was successful
+# if [ $? -ne 0 ]; then
+#     export MOVE_ON=false
+#     echo "Move on: $MOVE_ON"
+#     return 1
+# fi
 
-echo -e "\n\t>>>>> Stage 1d: Silent Detector $STG1_RAW_CHUNKS_WAVS\n"
+# echo -e "\n\t>>>>> Stage 1d: Silent Detector $STG1_RAW_CHUNKS_WAVS\n"
+# conda activate metaSR3
+# export keep_perc="90"
+# if [ "$SKIP_1D" != "true" ] && [ "$MOVE_ON" = "true" ]; then
+
+#     if [ "$DOUBLE_TALK_FLAG" = "true" ]; then
+#         python3 ${SRC_PATH}/01_VAD_chunks/Stage1d_silent_detector.py --input_chunks_folder $STG1_RAW_CHUNKS_WAVS\
+#         --filtered_wavs_folder $STG1_CHUNKS_WAVS\
+#         --keep_perc $keep_perc
+
+#         # Check if the Python script was successful
+#         if [ $? -ne 0 ]; then
+#             export MOVE_ON=false
+#             echo "Move on: $MOVE_ON"
+#             return 1
+#         fi
+#     else
+#         echo -e "\n\t>>>>> Silent detection SKIPPED! \n"
+#         cp -r $STG1_RAW_CHUNKS_WAVS/* $STG1_CHUNKS_WAVS
+#         # Check if the copy was successful
+#         if [ $? -ne 0 ]; then
+#             export MOVE_ON=false
+#             echo "Move on: $MOVE_ON"
+#             return 1
+#         fi
+#     fi
+# else
+#     echo -e "\n\t>>>>> Stage 1d: Silent detection skipped\n"
+# fi
+
+# echo -e "\t>>>>> Stage 1e: Double-Talk detection $STG1_CHUNKS_WAVS"
+# if [ "$SKIP_1E" != "true" ]; then
+
+#     if [ "$DOUBLE_TALK_FLAG" = "true" ]; then
+#         conda activate dtp11
+#         python3 ${SRC_PATH}/01_VAD_chunks/Stage1e_DT_detection.py --stg1_chunks_wavs $STG1_CHUNKS_WAVS\
+#         --stg1_dt_pretrained $STG1_DT_PRETRAINED \
+#         --stg1_filtered_chunks_wavs $STG1_FILTERED_CHUNKS_WAVS \
+#         --stg1_dt_th $DT_THRESHOLD
+
+#         # Check if the Python script was successful
+#         if [ $? -ne 0 ]; then
+#             export MOVE_ON=false
+#             echo "Move on: $MOVE_ON"
+#             return 1
+#         fi
+#     else
+#         echo -e "\n\t>>>>> Double-Talk detection SKIPPED! \n"
+#         cp -r $STG1_CHUNKS_WAVS/* $STG1_FILTERED_CHUNKS_WAVS
+#         # Check if the copy was successful
+#         if [ $? -ne 0 ]; then
+#             export MOVE_ON=false
+#             echo "Move on: $MOVE_ON"
+#             return 1
+#         fi
+#     fi
+# else
+#     echo -e "\n\t>>>>> Stage 1e: DT detection skipped\n"
+# fi
+
+
+echo -e "\n\t>>>>> Stage 1f: Create Speaker JSON and HTML\n"
 conda activate metaSR3
-export keep_perc="90"
-if [ "$SKIP_1D" != "true" ] && [ "$MOVE_ON" = "true" ]; then
 
-    if [ "$DOUBLE_TALK_FLAG" = "true" ]; then
-        python3 ${SRC_PATH}/01_VAD_chunks/Stage1d_silent_detector.py --input_chunks_folder $STG1_RAW_CHUNKS_WAVS\
-        --filtered_wavs_folder $STG1_CHUNKS_WAVS\
-        --keep_perc $keep_perc
-
-        # Check if the Python script was successful
-        if [ $? -ne 0 ]; then
-            export MOVE_ON=false
-            echo "Move on: $MOVE_ON"
-            return 1
-        fi
+# Check if input JSON exists
+if [ -f "$STG1_SPEAKERS_DATABASE_JSON" ]; then
+    python3 ${SRC_PATH}/01_VAD_chunks/Stage1f_create_speakers_json.py \
+        --input_json "$STG1_SPEAKERS_DATABASE_JSON" \
+        --output_json "$STG1_SPEAKERS_JSON" \
+        --gt_folder "$STG1_GT_FOLDER" 
+    # Check if the Python script was successful
+    if [ $? -ne 0 ]; then
+        export MOVE_ON=false
+        echo -e "\n\t ✗ ERROR: Stage 1f failed"
+        echo "Move on: $MOVE_ON"
+        return 1
     else
-        echo -e "\n\t>>>>> Silent detection SKIPPED! \n"
-        cp -r $STG1_RAW_CHUNKS_WAVS/* $STG1_CHUNKS_WAVS
-        # Check if the copy was successful
-        if [ $? -ne 0 ]; then
-            export MOVE_ON=false
-            echo "Move on: $MOVE_ON"
-            return 1
-        fi
+        echo -e "\n\t ✓ Stage 1f completed successfully"
+        echo -e "\tSpeaker JSON: $STG1_SPEAKERS_JSON"
+        echo -e "\tSpeaker HTML: ${STG1_SPEAKERS_JSON%.json}.html"
     fi
 else
-    echo -e "\n\t>>>>> Stage 1d: Silent detection skipped\n"
+    echo -e "\n\t WARNING: Input JSON not found: $STG1_SPEAKERS_DATABASE_JSON"
+    echo -e "\tSkipping Stage 1f: Speaker JSON creation"
+    echo -e "\tThis is optional - pipeline will continue\n"
 fi
 
-
-
-echo -e "\t>>>>> Stage 1e: Double-Talk detection $STG1_CHUNKS_WAVS"
-if [ "$SKIP_1E" != "true" ]; then
-
-    if [ "$DOUBLE_TALK_FLAG" = "true" ]; then
-        conda activate dtp11
-        python3 ${SRC_PATH}/01_VAD_chunks/Stage1e_DT_detection.py --stg1_chunks_wavs $STG1_CHUNKS_WAVS\
-        --stg1_dt_pretrained $STG1_DT_PRETRAINED \
-        --stg1_filtered_chunks_wavs $STG1_FILTERED_CHUNKS_WAVS \
-        --stg1_dt_th $DT_THRESHOLD
-
-        # Check if the Python script was successful
-        if [ $? -ne 0 ]; then
-            export MOVE_ON=false
-            echo "Move on: $MOVE_ON"
-            return 1
-        fi
-    else
-        echo -e "\n\t>>>>> Double-Talk detection SKIPPED! \n"
-        cp -r $STG1_CHUNKS_WAVS/* $STG1_FILTERED_CHUNKS_WAVS
-        # Check if the copy was successful
-        if [ $? -ne 0 ]; then
-            export MOVE_ON=false
-            echo "Move on: $MOVE_ON"
-            return 1
-        fi
-    fi
-else
-    echo -e "\n\t>>>>> Stage 1e: DT detection skipped\n"
-fi
+# Unset all stage 1 variables
+unset SKIP_VAD
+unset SKIP_1A
+unset SKIP_1C
+unset SKIP_1D
+unset SKIP_1E
+unset STG1_VAD_CSV
+unset path_to_yaml_folder
+unset STG1_RAW_CHUNKS_WAVS
+unset STG1_CHUNKS_WAVS
+unset VAD_ROOT
+unset path_to_yaml_file
+unset keep_perc

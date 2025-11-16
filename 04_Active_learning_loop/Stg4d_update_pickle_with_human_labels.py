@@ -159,9 +159,7 @@ def load_merged_h5_metadata(merged_h5_path):
             'merged_wav_paths': [wp.decode() if isinstance(wp, bytes) else wp
                                 for wp in hf['merged_samples']['merged_wav_paths'][:]],
             'start_times': hf['merged_samples']['start_times'][:],
-            'end_times': hf['merged_samples']['end_times'][:],
-            'cluster_labels': hf['merged_samples']['cluster_labels'][:],
-            'gt_labels': hf['merged_samples']['gt_labels'][:],
+            'end_times': hf['merged_samples']['end_times'][:]
         }
 
         print(f"✓ Loaded {n_merged} merged samples")

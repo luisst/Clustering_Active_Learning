@@ -2,13 +2,41 @@
 
 export MOVE_ON=true
 
-# Verify/create Stage 4 folders
-python3 ${SRC_PATH}/folder_verify.py $STG4_HUMAN
+## Validate speaker JSON consistency across dataset folders
+echo -e "\n\t>>>>> Validating Speaker JSON Consistency\n"
 
-# python3 ${SRC_PATH}/folder_verify.py $STG3_FINAL_CSV
-# if [ $? -eq 1 ]; then
-#     export SKIP_STG3e=true
-# fi
+# Build validation command with optional folders
+VALIDATION_CMD="python3 ${SRC_PATH}/04_Active_learning_loop/Stg4_validate_speaker_json.py --json_filename ${SPEAKERS_JSON_FILENAME}"
+
+# Add GT folder if it exists
+if [ -d "${GT_CSV_FOLDER}" ]; then
+    VALIDATION_CMD="${VALIDATION_CMD} --gt_folder ${GT_CSV_FOLDER}"
+fi
+
+# Add input_wavs folder if it exists
+if [ -d "${STG1_WAVS}" ]; then
+    VALIDATION_CMD="${VALIDATION_CMD} --input_wavs ${STG1_WAVS}"
+fi
+
+# Add input_mp4s folder if it exists
+if [ -d "${STG1_MP4_FOLDER}" ]; then
+    VALIDATION_CMD="${VALIDATION_CMD} --input_mp4s ${STG1_MP4_FOLDER}"
+fi
+
+# Execute validation
+eval ${VALIDATION_CMD}
+
+# Check if validation was successful
+if [ $? -ne 0 ]; then
+    echo -e "\n\t ✗ ERROR: Speaker JSON validation failed"
+    echo -e "\tPlease ensure ${SPEAKERS_JSON_FILENAME} files are consistent across folders"
+    echo -e "\tYou may need to regenerate them using the appropriate script\n"
+    export MOVE_ON=false
+    return 1
+fi
+
+# Verify/create Stage 4 folders
+python3 ${SRC_PATH}/folder_create.py $STG4_HUMAN
 
 ## Generate Active Learning input files from merged samples
 echo -e "\n\t>>>>> Stage 4a: Generate AL Input Files from Merged Samples\n"
@@ -33,19 +61,6 @@ fi
 # python3 ${SRC_PATH}/04_Active_learning_loop/stg4b_marker_webapp.py --stg1_mp4_candidate $STG1_MP4_FOLDER\
 #     --stg4_al_folder $current_stg4
 
-# ## Create the final csv file
-# echo -e "\n\t>>>>> Stage 3e: Output Final CSV prediction $STG3_FINAL_CSV\n"
-# if [ "$SKIP_STG3e" != "true" ]; then
-#     python3 ${SRC_PATH}/03_Clustering_TDA/Stg3e_create_csv_from_merged.py --stg3_merged_wavs $STG3_MERGED_WAVS\
-#     --stg3_final_csv $STG3_FINAL_CSV --stg3_separated_merged_wavs $STG3_SEPARATED_MERGED_WAVS
 
-#     # Check if the Python script was successful
-#     if [ $? -ne 0 ]; then
-#         export MOVE_ON=false
-#         echo "Move on: $MOVE_ON"
-#         return 1
-#     fi
-# else
-#     echo -e "\n\t>>>>> Stage 3e: Final CSV prediction skipped\n"
-# fi
-
+# Unset all stage 4 variables (MOVE_ON is set here but unset in main script)
+# No additional variables unique to stage 4 besides those in main script
