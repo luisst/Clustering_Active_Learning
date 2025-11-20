@@ -109,7 +109,7 @@ def load_h5_with_labels(h5_path):
             print(f"  ✓ Loaded human labels")
         else:
             raise ValueError("Human labels not found. Run Stage 4d first.")
-
+        
         print(f"  Total samples: {n_samples}")
 
     return data

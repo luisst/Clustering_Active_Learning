@@ -319,8 +319,8 @@
 <!-- 2705 check verde -->
 
                 <p>&nbsp &nbsp</p>
-                <button class="myButton" onclick="undoLastEntry()">&#x238C; Undo &nbsp<span class="kbdB">B</span>&nbsp</button>
-                <button class="myButton" id="eraseAllButton">&#x1F480; Erase All &nbsp</button>
+                <button class="myButton" onclick="undoLastEntry()">&#x238C; UndoTable &nbsp<span class="kbdB">B</span>&nbsp</button>
+                <button class="myButton" id="prevActiveRegionButton">&#x1F480; PrevRegion &nbsp</button>
             </div>
         </div>
     </div>
@@ -648,7 +648,7 @@
         let currentRow = null;
 
         let current_src = 0;
-        let current_index = 0;
+        let current_index = '0';
 
         let assumption_flag = false;
 
@@ -677,7 +677,7 @@
 
             // Extract the second and third values as floats
 
-            current_index = parseFloat(currentRow[0]);
+            current_index = String(currentRow[0]);
             current_src = parseFloat(currentRow[1]);
             var current_start_time = parseFloat(currentRow[2]);
             var current_end_time = parseFloat(currentRow[3]);
@@ -995,18 +995,6 @@
 
         }
         
-        document.getElementById('eraseAllButton').addEventListener('click', function() {
-            // Display the confirm dialog
-            const userConfirmed = confirm('Do you want to erase all data saved?');
-            
-            // If the user clicked "OK", change the color of the square
-            if (userConfirmed) {
-            restart_table_time();
-            console.log("Data erased");
-            console.log(outputData);
-            }
-        });
-
 
         // Undo last entry
         function undoLastEntry(){
@@ -1032,6 +1020,94 @@
         console.log(outputData);
 
         }
+
+        // Go back to previous region
+        function prevActiveRegion() {
+            // Check if we can go back
+            if (inputData_index <= 1) {
+                alert('Already at the first segment');
+                return;
+            }
+
+            // Remove current region if it exists
+            if (currentRegion) {
+                currentRegion.remove();
+            }
+
+            // Move back by 2 positions (current segment and previous segment)
+            inputData_index -= 2;
+
+            // Check if previous segment was already labeled
+            if (inputData[inputData_index][4] != 99) {
+                assumption_flag = true;
+            } else {
+                assumption_flag = false;
+            }
+
+            console.log("Going back to index: " + inputData_index + " Assumption flag: " + assumption_flag);
+            console.log(">>>>>>>>>>>>>>>>>>>>>>>>>> prev seg <<<<<<<<<<<<<<<<<<<<<<");
+
+            // Draw previous and next segments
+            draw_prev_after_segment(inputData_index);
+
+            // Get the previous row
+            currentRow = inputData[inputData_index++];
+
+            // Extract segment data
+            current_index = String(currentRow[0]);
+            current_src = parseFloat(currentRow[1]);
+            var current_start_time = parseFloat(currentRow[2]);
+            var current_end_time = parseFloat(currentRow[3]);
+
+            // Restore the speaker assignment if it exists
+            if (currentRow[4] != 99) {
+                current_name = currentRow[4];
+            }
+
+            // Create region with appropriate color
+            currentRegion = wsRegions.addRegion({
+                start: current_start_time,
+                end: current_end_time,
+                color: assumption_flag ? return_speaker_color(inputData_index - 1) : `rgba(93,109,126, 0.5)`,
+                drag: true,
+                resize: true,
+                minLength: 0.5,
+                maxLength: 20,
+            });
+
+            // Calculate zoom and scroll
+            const duration = current_end_time - current_start_time;
+            const zoomLevel = ws.getDuration() / (duration / 0.8);
+            ws.zoom(zoomLevel);
+
+            const scrollPosition = (current_start_time + duration / 2) * ws.options.minPxPerSec - ws.renderer.scrollContainer.clientWidth / 2;
+            ws.renderer.scrollContainer.scrollLeft = scrollPosition;
+
+            console.log("\tCluster: " + current_src + " Start: " + current_start_time + " End: " + current_end_time);
+
+            // Set time to segment start
+            ws.setTime(current_start_time);
+
+            // Update UI
+            document.getElementById('tclusternum').textContent = String(current_src);
+            document.getElementById('tsamplenum').textContent = String(inputData_index);
+            document.getElementById('tstartt').textContent = current_start_time.toFixed(2);
+            document.getElementById('tstopt').textContent = current_end_time.toFixed(2);
+        }
+
+        // Add event listener for previous region button
+        document.getElementById('prevActiveRegionButton').addEventListener('click', function() {
+            prevActiveRegion();
+        });
+
+        // Add keyboard shortcut (Shift+J or Shift+H)
+        document.addEventListener('keydown', function(event) {
+            if ((event.key === 'H' || event.key === 'h') && event.shiftKey) {
+                prevActiveRegion();
+            }
+        });
+
+
 
         function restart_table_time(){
         // Erase timetable
